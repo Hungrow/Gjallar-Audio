@@ -109,9 +109,9 @@ fun GjallarMenuSheet(
                             letterSpacing = 1.sp,
                             color = Slate50
                         )
-                        Spacer(modifier = Modifier.width(5.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "AUDIO",
+                            text = "HORN",
                             fontWeight = FontWeight.Light,
                             fontSize = 20.sp,
                             letterSpacing = 1.sp,

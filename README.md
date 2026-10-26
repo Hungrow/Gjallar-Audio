@@ -1,10 +1,10 @@
-# 🛡️ Gjallarhorn — Gjallar Audio Suite & Sleep
+# 🛡️ Gjallarhorn
 > **Ecosistema Heimdall** — Suite integral de sonido, descanso inteligente, bloc de notas rúnico, botonera de aullidos y laboratorio de audio para Android.
 
 ---
 
 ## 🌌 Visión
-En la mitología nórdica, el **Gjallarhorn** es el cuerno custodiado por el dios **Heimdall**, cuyo sonido resuena con fuerza a través de los nueve reinos. **Gjallar Audio** traslada ese espíritu al smartphone con una navaja suiza de herramientas acústicas, descanso nocturno y productividad bajo una estética nórdica **Dark Slate**, optimizada a 60/120 fps y compatible desde Android 8.0 hasta Android 14+.
+En la mitología nórdica y la leyenda de los guardianes, el **Gjallarhorn** es el artefacto supremo custodiado por el dios **Heimdall**, cuyo sonido resuena con fuerza a través de los nueve reinos. **Gjallarhorn** traslada ese espíritu al smartphone con una navaja suiza de herramientas acústicas, descanso nocturno y productividad bajo una estética nórdica **Dark Slate**, optimizada a 60/120 fps y compatible desde Android 8.0 hasta Android 14+.
 
 ---
 
@@ -12,7 +12,7 @@ En la mitología nórdica, el **Gjallarhorn** es el cuerno custodiado por el dio
 
 ```
                    ┌─────────────────────────────────────────┐
-                   │        🛡️ GJALLAR AUDIO SUITE           │
+                   │          🛡️ GJALLARHORN SUITE           │
                    └────────────────────┬────────────────────┘
           ┌──────────────┬──────────────┼──────────────┬──────────────┐
           ▼              ▼              ▼              ▼              ▼

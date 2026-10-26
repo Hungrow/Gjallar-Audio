@@ -94,7 +94,7 @@
         <!-- Administrador de dispositivo para apagar la pantalla cuando finaliza el temporizador -->
         <receiver
             android:name=".feature.night.GjallarDeviceAdminReceiver"
-            android:label="Gjallar Sleep Timer"
+            android:label="Gjallarhorn Sleep Timer"
             android:description="@string/app_name"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
             android:exported="true">
@@ -108,7 +108,7 @@
 
         <service
             android:name=".feature.night.MediaNotificationListener"
-            android:label="Control de Streaming Gjallar"
+            android:label="Control de Streaming Gjallarhorn"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true">
             <intent-filter>

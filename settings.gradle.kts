@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "GjallarAudio"
+rootProject.name = "Gjallarhorn"
 include(":app")

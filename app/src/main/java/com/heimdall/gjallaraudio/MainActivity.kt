@@ -102,9 +102,9 @@ fun MainAppScaffold() {
                                     letterSpacing = 1.sp,
                                     color = Slate50
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
                                 Text(
-                                    text = "AUDIO",
+                                    text = "HORN",
                                     fontWeight = FontWeight.Light,
                                     fontSize = 18.sp,
                                     letterSpacing = 1.sp,
