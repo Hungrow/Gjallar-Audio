@@ -47,10 +47,10 @@ fun GjallarMenuSheet(
     var updateStatus by remember { mutableStateOf<UpdateStatus>(UpdateStatus.Idle) }
     var showCoffeeDialog by remember { mutableStateOf(false) }
 
-    // Preferencias del enlace de café
+    // Preferencias del enlace de donación / café
     val prefs = remember { context.getSharedPreferences("gjallar_settings", Context.MODE_PRIVATE) }
     var coffeeUrl by remember {
-        mutableStateOf(prefs.getString("coffee_url", "https://ko-fi.com/hungrow") ?: "https://ko-fi.com/hungrow")
+        mutableStateOf(prefs.getString("coffee_url", "https://paypal.me/HeimdallCorp") ?: "https://paypal.me/HeimdallCorp")
     }
 
     ModalBottomSheet(
@@ -569,7 +569,7 @@ fun GjallarMenuSheet(
 
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "Puedes invitar al creador a un café a través de Ko-fi o PayPal para apoyar el mantenimiento de la IA y nuevas funciones.",
+                        text = "Puedes apoyar el desarrollo de GjallarAudio invitando al creador a un café a través de PayPal para impulsar nuevas funciones y optimizaciones de IA.",
                         fontSize = 12.sp,
                         color = Slate300,
                         lineHeight = 16.sp
@@ -592,7 +592,7 @@ fun GjallarMenuSheet(
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = "☕ Invitar a un Café",
+                                text = "☕ Invitar a un Café (PayPal)",
                                 color = Slate950,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
@@ -785,8 +785,8 @@ fun GjallarMenuSheet(
                     OutlinedTextField(
                         value = tempUrl,
                         onValueChange = { tempUrl = it },
-                        label = { Text("URL de donación") },
-                        placeholder = { Text("https://ko-fi.com/tu_usuario") },
+                        label = { Text("URL de donación / PayPal") },
+                        placeholder = { Text("https://paypal.me/HeimdallCorp") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GjallarCyan,
