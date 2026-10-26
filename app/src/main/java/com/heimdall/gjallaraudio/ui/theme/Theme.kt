@@ -39,7 +39,9 @@ fun GjallarAudioTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+            @Suppress("DEPRECATION")
             window.statusBarColor = Slate900.toArgb()
+            @Suppress("DEPRECATION")
             window.navigationBarColor = Slate900.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
             WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false

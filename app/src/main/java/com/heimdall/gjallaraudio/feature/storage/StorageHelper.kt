@@ -55,7 +55,14 @@ object StorageHelper {
         }
     }
 
-    fun getInstalledExplorers(context: Context): List<InstalledExplorer> {
+    @Volatile
+    private var cachedExplorers: List<InstalledExplorer>? = null
+
+    fun getInstalledExplorers(context: Context, forceRefresh: Boolean = false): List<InstalledExplorer> {
+        if (!forceRefresh && cachedExplorers != null) {
+            return cachedExplorers!!
+        }
+
         val pm = context.packageManager
         val result = mutableListOf<InstalledExplorer>()
 
@@ -92,6 +99,7 @@ object StorageHelper {
             )
         )
 
+        cachedExplorers = result
         return result
     }
 

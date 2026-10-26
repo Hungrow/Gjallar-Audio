@@ -59,7 +59,14 @@ object StreamingAppDetector {
         }
     }
 
-    fun getInstalledStreamingApps(context: Context): List<InstalledStreamingApp> {
+    @Volatile
+    private var cachedStreamingApps: List<InstalledStreamingApp>? = null
+
+    fun getInstalledStreamingApps(context: Context, forceRefresh: Boolean = false): List<InstalledStreamingApp> {
+        if (!forceRefresh && cachedStreamingApps != null) {
+            return cachedStreamingApps!!
+        }
+
         val pm = context.packageManager
         val list = mutableListOf<InstalledStreamingApp>()
         for ((pkg, defaultName) in POPULAR_STREAMING_APPS) {
@@ -69,6 +76,7 @@ object StreamingAppDetector {
                 list.add(InstalledStreamingApp(packageName = pkg, name = label))
             } catch (_: Exception) {}
         }
+        cachedStreamingApps = list
         return list
     }
 

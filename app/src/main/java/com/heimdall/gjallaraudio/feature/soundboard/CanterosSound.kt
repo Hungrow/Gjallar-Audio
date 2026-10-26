@@ -103,4 +103,6 @@ object CanterosCatalog {
     )
 
     val categories = listOf("Todos", "Canteros", "Homer", "Flanders", "Moe", "Nelson", "Milhouse", "Ralph", "Burns", "Abuelo", "Bart", "Skinner", "Willie", "Smithers", "Otros")
+
+    val soundsById: Map<String, CanterosSound> by lazy { sounds.associateBy { it.id } }
 }

@@ -21,9 +21,20 @@ object CustomSoundsRepository {
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    fun getCustomSounds(context: Context): List<CanterosSound> {
+    // Memoria caché para evitar lecturas de disco innecesarias durante la navegación
+    @Volatile
+    private var memoryCache: List<CanterosSound>? = null
+
+    fun getCustomSounds(context: Context, forceRefresh: Boolean = false): List<CanterosSound> {
+        if (!forceRefresh && memoryCache != null) {
+            return memoryCache!!
+        }
+
         val file = File(context.filesDir, JSON_FILE)
-        if (!file.exists()) return emptyList()
+        if (!file.exists()) {
+            memoryCache = emptyList()
+            return emptyList()
+        }
 
         return try {
             val jsonStr = file.readText(Charsets.UTF_8)
@@ -45,6 +56,7 @@ object CustomSoundsRepository {
                     )
                 }
             }
+            memoryCache = list
             list
         } catch (e: Exception) {
             e.printStackTrace()
@@ -110,6 +122,7 @@ object CustomSoundsRepository {
     }
 
     private fun saveAll(context: Context, list: List<CanterosSound>) {
+        memoryCache = list
         try {
             val jsonArray = JSONArray()
             list.forEach { s ->

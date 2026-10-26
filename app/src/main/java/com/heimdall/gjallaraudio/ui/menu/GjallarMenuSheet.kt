@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -828,7 +829,7 @@ fun GjallarMenuSheet(
                             )
                         }
                         Icon(
-                            Icons.Default.OpenInNew,
+                            Icons.AutoMirrored.Filled.OpenInNew,
                             contentDescription = null,
                             tint = Slate500,
                             modifier = Modifier.size(16.dp)
@@ -871,7 +872,7 @@ fun GjallarMenuSheet(
                             )
                         }
                         Icon(
-                            Icons.Default.OpenInNew,
+                            Icons.AutoMirrored.Filled.OpenInNew,
                             contentDescription = null,
                             tint = Slate500,
                             modifier = Modifier.size(16.dp)
@@ -1035,7 +1036,7 @@ fun GjallarMenuSheet(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.OpenInNew, contentDescription = null, tint = Slate400, modifier = Modifier.size(20.dp))
+                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = Slate400, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text("Otras aplicaciones instaladas...", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Slate100)

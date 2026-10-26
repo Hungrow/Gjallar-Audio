@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.*
@@ -104,6 +105,11 @@ fun CanterosScreen(
     // Lista combinada de sonidos locales (Built-in + Custom descargados)
     val allLocalSounds = remember(customSounds) {
         customSounds + CanterosCatalog.sounds
+    }
+
+    // Índice HashSet O(1) para verificar al instante qué sonidos están ya descargados
+    val downloadedNamesSet = remember(allLocalSounds) {
+        allLocalSounds.map { it.title.trim().lowercase() }.toSet()
     }
 
     val filteredSounds = remember(selectedMainTab, searchQuery, selectedCategory, favoriteIds, allLocalSounds) {
@@ -310,7 +316,7 @@ fun CanterosScreen(
                                 isSearchingOnline = false
                             }
                         }) {
-                            Icon(Icons.Filled.ArrowForward, contentDescription = "Buscar", tint = GjallarAmber, modifier = Modifier.size(18.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Buscar", tint = GjallarAmber, modifier = Modifier.size(18.dp))
                         }
                     }
                 },
@@ -399,7 +405,7 @@ fun CanterosScreen(
                 ) {
                     items(onlineResults, key = { it.slug + it.soundUrl }) { item ->
                         val isPlaying = currentlyPlayingId == item.slug
-                        val isDownloaded = allLocalSounds.any { it.title.equals(item.name, ignoreCase = true) }
+                        val isDownloaded = downloadedNamesSet.contains(item.name.trim().lowercase())
                         val isDownloading = downloadingIds.contains(item.slug)
 
                         Card(
