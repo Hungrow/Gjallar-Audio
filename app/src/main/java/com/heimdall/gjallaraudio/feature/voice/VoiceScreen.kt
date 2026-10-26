@@ -163,6 +163,16 @@ fun VoiceScreen(
     var notes by remember {
         mutableStateOf(NotesRepository.loadNotes(context))
     }
+    var noteSearchQuery by remember { mutableStateOf("") }
+    var editingNote by remember { mutableStateOf<StickyNote?>(null) }
+
+    val filteredNotes = remember(notes, noteSearchQuery) {
+        if (noteSearchQuery.isBlank()) notes
+        else notes.filter {
+            it.title.contains(noteSearchQuery, ignoreCase = true) ||
+            it.content.contains(noteSearchQuery, ignoreCase = true)
+        }
+    }
 
     val updateNotes: (List<StickyNote>) -> Unit = { newNotes ->
         notes = newNotes
@@ -470,7 +480,7 @@ fun VoiceScreen(
         // =========================================================================
         item {
             Text(
-                text = "MURO DE RECUERDOS (${notes.size})",
+                text = "MURO DE RECUERDOS (${filteredNotes.size})",
                 style = MaterialTheme.typography.labelSmall,
                 color = GjallarAmber,
                 fontWeight = FontWeight.Bold,
@@ -478,7 +488,40 @@ fun VoiceScreen(
             )
         }
 
-        if (notes.isEmpty()) {
+        if (notes.isNotEmpty()) {
+            item {
+                OutlinedTextField(
+                    value = noteSearchQuery,
+                    onValueChange = { noteSearchQuery = it },
+                    placeholder = { Text("Buscar en tus notas...", color = Slate400, fontSize = 13.sp) },
+                    leadingIcon = {
+                        Icon(Icons.Filled.Search, contentDescription = null, tint = Slate400, modifier = Modifier.size(18.dp))
+                    },
+                    trailingIcon = {
+                        if (noteSearchQuery.isNotEmpty()) {
+                            IconButton(onClick = { noteSearchQuery = "" }, modifier = Modifier.size(20.dp)) {
+                                Icon(Icons.Filled.Close, contentDescription = "Limpiar", tint = Slate400, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Slate850,
+                        unfocusedContainerColor = Slate850,
+                        focusedBorderColor = GjallarCyan,
+                        unfocusedBorderColor = Slate700,
+                        focusedTextColor = Slate50,
+                        unfocusedTextColor = Slate100
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                )
+            }
+        }
+
+        if (filteredNotes.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier
@@ -489,7 +532,8 @@ fun VoiceScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "El muro está despejado. Escribe una nota en el lienzo inferior.",
+                        text = if (noteSearchQuery.isNotEmpty()) "No hay notas que coincidan con la búsqueda."
+                               else "El muro está despejado. Escribe una nota en el lienzo inferior.",
                         style = MaterialTheme.typography.bodySmall,
                         color = Slate400
                     )
@@ -497,7 +541,7 @@ fun VoiceScreen(
             }
         }
 
-        items(notes) { note ->
+        items(filteredNotes) { note ->
             Card(
                 colors = CardDefaults.cardColors(containerColor = note.theme.cardBg),
                 shape = RoundedCornerShape(14.dp),
@@ -506,8 +550,7 @@ fun VoiceScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        clipboardManager.setText(AnnotatedString("${note.title}\n${note.content}"))
-                        Toast.makeText(context, "Nota copiada", Toast.LENGTH_SHORT).show()
+                        editingNote = note
                     }
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
@@ -549,6 +592,18 @@ fun VoiceScreen(
                                 color = note.theme.textColor.copy(alpha = 0.7f)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
+                            IconButton(
+                                onClick = { editingNote = note },
+                                modifier = Modifier.size(22.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Edit,
+                                    contentDescription = "Editar",
+                                    tint = note.theme.textColor.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(2.dp))
                             IconButton(
                                 onClick = { updateNotes(notes.filterNot { it.id == note.id }) },
                                 modifier = Modifier.size(22.dp)
@@ -812,5 +867,95 @@ fun VoiceScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+
+    if (editingNote != null) {
+        val currentNote = editingNote!!
+        var editTitle by remember(currentNote) { mutableStateOf(currentNote.title) }
+        var editContent by remember(currentNote) { mutableStateOf(currentNote.content) }
+        var editTheme by remember(currentNote) { mutableStateOf(currentNote.theme) }
+
+        AlertDialog(
+            onDismissRequest = { editingNote = null },
+            title = {
+                Text("Editar Nota Rúnica", color = Slate50, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = editTitle,
+                        onValueChange = { editTitle = it },
+                        label = { Text("Título", color = Slate400) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Slate50,
+                            unfocusedTextColor = Slate100,
+                            focusedBorderColor = GjallarCyan,
+                            unfocusedBorderColor = Slate700
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editContent,
+                        onValueChange = { editContent = it },
+                        label = { Text("Contenido", color = Slate400) },
+                        minLines = 3,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Slate50,
+                            unfocusedTextColor = Slate100,
+                            focusedBorderColor = GjallarCyan,
+                            unfocusedBorderColor = Slate700
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        NordicNoteTheme.entries.forEach { theme ->
+                            val isSel = editTheme == theme
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(theme.cardBg)
+                                    .border(
+                                        width = if (isSel) 2.5.dp else 1.dp,
+                                        color = if (isSel) GjallarCyan else theme.borderColor,
+                                        shape = CircleShape
+                                    )
+                                    .clickable { editTheme = theme },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(theme.rune, fontSize = 12.sp, color = theme.titleColor, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val updated = currentNote.copy(
+                            title = editTitle.trim(),
+                            content = editContent.trim(),
+                            theme = editTheme
+                        )
+                        updateNotes(notes.map { if (it.id == currentNote.id) updated else it })
+                        editingNote = null
+                        Toast.makeText(context, "Nota actualizada", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GjallarCyan, contentColor = Slate950)
+                ) {
+                    Text("Guardar", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingNote = null }) {
+                    Text("Cancelar", color = Slate400)
+                }
+            },
+            containerColor = Slate850
+        )
     }
 }

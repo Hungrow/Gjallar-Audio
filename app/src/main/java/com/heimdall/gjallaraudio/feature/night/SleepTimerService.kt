@@ -186,6 +186,9 @@ class SleepTimerService : Service(), SensorEventListener {
                 try {
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
                 } catch (_: Exception) {}
+                try {
+                    AmbientSoundEngine.fadeVolume(progress)
+                } catch (_: Exception) {}
 
                 updateNotificationFading(remaining)
             }
@@ -201,6 +204,9 @@ class SleepTimerService : Service(), SensorEventListener {
         if (isFadingPhase && initialVolume > 0) {
             try {
                 audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, initialVolume, 0)
+            } catch (_: Exception) {}
+            try {
+                AmbientSoundEngine.fadeVolume(1f)
             } catch (_: Exception) {}
         }
         val newDuration = _remainingSeconds.value + extraSeconds
@@ -299,6 +305,11 @@ class SleepTimerService : Service(), SensorEventListener {
                 @Suppress("DEPRECATION")
                 audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
             }
+        } catch (_: Exception) {}
+
+        // 4. Detener sonidos ambientes nórdicos propios de Gjallarhorn
+        try {
+            AmbientSoundEngine.stopActiveSounds()
         } catch (_: Exception) {}
     }
 

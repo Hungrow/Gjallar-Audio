@@ -43,18 +43,51 @@ class AmbientChannelPlayer(private val context: Context, private val rawResId: I
 }
 
 class AmbientSoundEngine(context: Context) {
+
+    companion object {
+        @Volatile
+        private var instance: AmbientSoundEngine? = null
+
+        fun getInstance(context: Context): AmbientSoundEngine {
+            return instance ?: synchronized(this) {
+                instance ?: AmbientSoundEngine(context.applicationContext).also { instance = it }
+            }
+        }
+
+        fun stopActiveSounds() {
+            instance?.stopAll()
+        }
+
+        fun fadeVolume(factor: Float) {
+            instance?.applyVolumeFactor(factor)
+        }
+    }
+
     private val rain = AmbientChannelPlayer(context, R.raw.rain_loop)
     private val wind = AmbientChannelPlayer(context, R.raw.wind_loop)
     private val fire = AmbientChannelPlayer(context, R.raw.fire_loop)
     private val delta = AmbientChannelPlayer(context, R.raw.delta_loop)
 
+    private var baseRainVol = 0f
+    private var baseWindVol = 0f
+    private var baseFireVol = 0f
+    private var baseDeltaVol = 0f
+
     fun setVolume(type: SoundscapeType, volume: Float) {
         when (type) {
-            SoundscapeType.RAIN -> rain.setVolume(volume)
-            SoundscapeType.WIND -> wind.setVolume(volume)
-            SoundscapeType.FIRE -> fire.setVolume(volume)
-            SoundscapeType.DELTA -> delta.setVolume(volume)
+            SoundscapeType.RAIN -> { baseRainVol = volume; rain.setVolume(volume) }
+            SoundscapeType.WIND -> { baseWindVol = volume; wind.setVolume(volume) }
+            SoundscapeType.FIRE -> { baseFireVol = volume; fire.setVolume(volume) }
+            SoundscapeType.DELTA -> { baseDeltaVol = volume; delta.setVolume(volume) }
         }
+    }
+
+    fun applyVolumeFactor(factor: Float) {
+        val f = factor.coerceIn(0f, 1f)
+        rain.setVolume(baseRainVol * f)
+        wind.setVolume(baseWindVol * f)
+        fire.setVolume(baseFireVol * f)
+        delta.setVolume(baseDeltaVol * f)
     }
 
     fun stopAll() {
@@ -62,5 +95,9 @@ class AmbientSoundEngine(context: Context) {
         wind.release()
         fire.release()
         delta.release()
+        baseRainVol = 0f
+        baseWindVol = 0f
+        baseFireVol = 0f
+        baseDeltaVol = 0f
     }
 }

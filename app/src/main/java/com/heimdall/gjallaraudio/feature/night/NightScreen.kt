@@ -62,12 +62,7 @@ fun NightScreen(
     val remainingSeconds by SleepTimerService.remainingSeconds.collectAsState()
 
     // Motor de Sonidos Ambientes Nórdicos con grabaciones orgánicas en bucle
-    val ambientEngine = remember { AmbientSoundEngine(context) }
-    DisposableEffect(Unit) {
-        onDispose {
-            ambientEngine.stopAll()
-        }
-    }
+    val ambientEngine = remember { AmbientSoundEngine.getInstance(context) }
 
     Column(
         modifier = modifier
