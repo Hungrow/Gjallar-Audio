@@ -11,6 +11,39 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
+    <queries>
+        <!-- Permite consultar intents para explorar carpetas y archivos -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="resource/folder" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="vnd.android.document/directory" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+            <data android:mimeType="*/*" />
+        </intent>
+
+        <!-- Gestores de archivos conocidos populares para visibilidad en Android 11+ -->
+        <package android:name="pl.solidexplorer2" />
+        <package android:name="pl.solidexplorer" />
+        <package android:name="com.sec.android.app.myfiles" />
+        <package android:name="com.mi.android.globalFileexplorer" />
+        <package android:name="com.google.android.apps.nbu.files" />
+        <package android:name="com.cxinventor.file.explorer" />
+        <package android:name="com.alphainventor.filemanager" />
+        <package android:name="com.ghisler.android.TotalCommander" />
+        <package android:name="nextapp.fx" />
+        <package android:name="com.amaze.filemanager" />
+        <package android:name="me.zhanghai.android.files" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

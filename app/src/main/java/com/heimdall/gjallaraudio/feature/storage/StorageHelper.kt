@@ -5,13 +5,14 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
-import android.provider.DocumentsContract
 import android.widget.Toast
 import java.io.File
 
 object StorageHelper {
+
+    private const val PREFS_NAME = "gjallar_storage_prefs"
+    private const val KEY_PREFERRED_EXPLORER = "preferred_file_explorer"
 
     val publicMusicDirPath: String
         get() = "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC).absolutePath}/GjallarAudio"
@@ -19,11 +20,88 @@ object StorageHelper {
     val displayMusicPath: String
         get() = "Almacenamiento interno > Music > GjallarAudio (y GjallarForge / GjallarLab)"
 
-    fun copyPathToClipboard(context: Context) {
+    data class InstalledExplorer(
+        val packageName: String,
+        val name: String,
+        val isSystem: Boolean = false
+    )
+
+    fun getPreferredExplorer(context: Context): String? {
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return sp.getString(KEY_PREFERRED_EXPLORER, null)
+    }
+
+    fun setPreferredExplorer(context: Context, packageName: String?) {
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        sp.edit().apply {
+            if (packageName == null) {
+                remove(KEY_PREFERRED_EXPLORER)
+            } else {
+                putString(KEY_PREFERRED_EXPLORER, packageName)
+            }
+            apply()
+        }
+    }
+
+    fun getPreferredExplorerLabel(context: Context): String? {
+        val pkg = getPreferredExplorer(context) ?: return null
+        if (pkg == "SYSTEM") return "Explorador del Sistema"
+        return try {
+            val pm = context.packageManager
+            val appInfo = pm.getApplicationInfo(pkg, 0)
+            pm.getApplicationLabel(appInfo)?.toString() ?: pkg
+        } catch (_: Exception) {
+            if (pkg.contains("solidexplorer")) "Solid Explorer" else pkg
+        }
+    }
+
+    fun getInstalledExplorers(context: Context): List<InstalledExplorer> {
+        val pm = context.packageManager
+        val result = mutableListOf<InstalledExplorer>()
+
+        val knownList = listOf(
+            "pl.solidexplorer2" to "Solid Explorer",
+            "pl.solidexplorer" to "Solid Explorer Classic",
+            "com.google.android.apps.nbu.files" to "Files de Google",
+            "com.sec.android.app.myfiles" to "Mis Archivos (Samsung)",
+            "com.mi.android.globalFileexplorer" to "Administrador de archivos (Xiaomi)",
+            "com.cxinventor.file.explorer" to "Cx Explorador de Archivos",
+            "com.alphainventor.filemanager" to "File Manager Plus",
+            "com.ghisler.android.TotalCommander" to "Total Commander",
+            "nextapp.fx" to "FX File Explorer",
+            "com.amaze.filemanager" to "Amaze File Manager",
+            "me.zhanghai.android.files" to "Material Files"
+        )
+
+        for ((pkg, defaultLabel) in knownList) {
+            try {
+                val appInfo = pm.getApplicationInfo(pkg, 0)
+                val label = pm.getApplicationLabel(appInfo)?.toString() ?: defaultLabel
+                result.add(InstalledExplorer(packageName = pkg, name = label))
+            } catch (_: Exception) {
+                // Not installed or not visible
+            }
+        }
+
+        // Sistema predeterminado siempre disponible
+        result.add(
+            InstalledExplorer(
+                packageName = "SYSTEM",
+                name = "Explorador del Sistema (Android)",
+                isSystem = true
+            )
+        )
+
+        return result
+    }
+
+    fun copyPathToClipboard(context: Context, showToast: Boolean = true) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("Ruta GjallarAudio", publicMusicDirPath)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "Ruta copiada al portapapeles: $publicMusicDirPath", Toast.LENGTH_SHORT).show()
+        if (showToast) {
+            Toast.makeText(context, "Ruta copiada al portapapeles: $publicMusicDirPath", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun openSystemFiles(context: Context) {
@@ -44,14 +122,53 @@ object StorageHelper {
         }
     }
 
+    fun openFolderWithPackage(context: Context, packageName: String) {
+        if (packageName == "SYSTEM") {
+            openSystemFiles(context)
+            return
+        }
+
+        val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+        val gjallarDir = File(musicDir, "GjallarAudio")
+        if (!gjallarDir.exists()) gjallarDir.mkdirs()
+
+        copyPathToClipboard(context, showToast = false)
+
+        try {
+            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Music%2FGjallarAudio")
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "vnd.android.document/directory")
+                setPackage(packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(intent)
+            return
+        } catch (_: Exception) {
+            // Intento 2: Iniciar la app directamente
+            try {
+                val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(launchIntent)
+                    Toast.makeText(context, "Abriendo gestor (Ruta copiada al portapapeles)", Toast.LENGTH_SHORT).show()
+                    return
+                }
+            } catch (_: Exception) {}
+        }
+
+        // Intento 3: Fallback a explorador del sistema
+        openSystemFiles(context)
+    }
+
     fun openWithChooser(context: Context) {
         val intents = mutableListOf<Intent>()
 
         val knownPackages = listOf(
+            "pl.solidexplorer2",
+            "pl.solidexplorer",
             "com.sec.android.app.myfiles",
             "com.mi.android.globalFileexplorer",
             "com.google.android.apps.nbu.files",
-            "pl.solidexplorer2",
             "com.cxinventor.file.explorer",
             "com.ghisler.android.TotalCommander"
         )

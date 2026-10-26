@@ -31,10 +31,10 @@ enum class GjallarDestination(
     ),
     CANTEROS(
         route = "canteros",
-        title = "Gjallar Soundboard",
-        subtitle = "Botonera de Frases y Memes",
+        title = "Gjallar Aullidos",
+        subtitle = "Botonera de Frases y Sonidos",
         icon = Icons.Filled.Campaign,
-        navLabel = "Sonidos"
+        navLabel = "Aullidos"
     ),
     VOICE(
         route = "voice",

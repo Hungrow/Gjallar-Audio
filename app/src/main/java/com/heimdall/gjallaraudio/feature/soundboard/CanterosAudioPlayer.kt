@@ -31,7 +31,6 @@ class CanterosAudioPlayer(private val context: Context) {
         stop()
 
         try {
-            val afd = context.assets.openFd(sound.assetPath)
             mediaPlayer = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
@@ -39,7 +38,16 @@ class CanterosAudioPlayer(private val context: Context) {
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .build()
                 )
-                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+
+                if (sound.assetPath.startsWith("http://") || sound.assetPath.startsWith("https://")) {
+                    setDataSource(sound.assetPath)
+                } else if (File(sound.assetPath).exists()) {
+                    setDataSource(sound.assetPath)
+                } else {
+                    val afd = context.assets.openFd(sound.assetPath)
+                    setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                }
+
                 prepare()
                 setOnCompletionListener {
                     _currentlyPlayingId.value = null
@@ -48,6 +56,39 @@ class CanterosAudioPlayer(private val context: Context) {
                 start()
             }
             _currentlyPlayingId.value = sound.id
+        } catch (e: Exception) {
+            e.printStackTrace()
+            _currentlyPlayingId.value = null
+        }
+    }
+
+    fun playUrl(url: String, id: String) {
+        stop()
+
+        try {
+            mediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .build()
+                )
+                setDataSource(url)
+                prepareAsync()
+                setOnPreparedListener {
+                    it.start()
+                    _currentlyPlayingId.value = id
+                }
+                setOnCompletionListener {
+                    _currentlyPlayingId.value = null
+                    stop()
+                }
+                setOnErrorListener { _, _, _ ->
+                    _currentlyPlayingId.value = null
+                    stop()
+                    true
+                }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             _currentlyPlayingId.value = null
@@ -65,19 +106,24 @@ class CanterosAudioPlayer(private val context: Context) {
 
     fun shareSound(sound: CanterosSound) {
         try {
-            val cleanName = sound.title.replace(Regex("[^a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ]"), "_")
-            val cacheFile = File(context.cacheDir, "Canteros_${cleanName}.mp3")
+            val audioFile = if (File(sound.assetPath).exists()) {
+                File(sound.assetPath)
+            } else {
+                val cleanName = sound.title.replace(Regex("[^a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ]"), "_")
+                val cacheFile = File(context.cacheDir, "Canteros_${cleanName}.mp3")
 
-            context.assets.open(sound.assetPath).use { input ->
-                FileOutputStream(cacheFile).use { output ->
-                    input.copyTo(output)
+                context.assets.open(sound.assetPath).use { input ->
+                    FileOutputStream(cacheFile).use { output ->
+                        input.copyTo(output)
+                    }
                 }
+                cacheFile
             }
 
             val uri = FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.fileprovider",
-                cacheFile
+                audioFile
             )
 
             val shareIntent = Intent(Intent.ACTION_SEND).apply {

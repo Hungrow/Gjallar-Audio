@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.heimdall.gjallaraudio.BuildConfig
@@ -47,6 +48,9 @@ fun GjallarMenuSheet(
 
     var updateStatus by remember { mutableStateOf<UpdateStatus>(UpdateStatus.Idle) }
     var showExplorerDialog by remember { mutableStateOf(false) }
+    var preferredExplorer by remember { mutableStateOf(StorageHelper.getPreferredExplorer(context)) }
+    var preferredLabel by remember { mutableStateOf(StorageHelper.getPreferredExplorerLabel(context)) }
+    var rememberChoice by remember { mutableStateOf(true) }
 
     // Enlace oficial de PayPal
     val coffeeUrl = "https://paypal.me/HeimdallCorp"
@@ -494,10 +498,17 @@ fun GjallarMenuSheet(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Button(
-                            onClick = { showExplorerDialog = true },
+                            onClick = {
+                                if (preferredExplorer != null) {
+                                    StorageHelper.openFolderWithPackage(context, preferredExplorer!!)
+                                } else {
+                                    showExplorerDialog = true
+                                }
+                            },
                             colors = ButtonDefaults.buttonColors(containerColor = GjallarAmber),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.weight(1f)
@@ -510,18 +521,39 @@ fun GjallarMenuSheet(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Abrir Archivos",
+                                text = if (preferredExplorer != null) "Abrir (${preferredLabel ?: "Archivos"})" else "Abrir Archivos",
                                 color = Slate950,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
+                        }
+
+                        if (preferredExplorer != null) {
+                            OutlinedButton(
+                                onClick = { showExplorerDialog = true },
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, Slate700),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Tune,
+                                    contentDescription = "Cambiar aplicación predeterminada",
+                                    tint = GjallarCyan,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Cambiar", color = GjallarCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
 
                         OutlinedButton(
                             onClick = { StorageHelper.copyPathToClipboard(context) },
                             shape = RoundedCornerShape(10.dp),
                             border = BorderStroke(1.dp, Slate700),
-                            modifier = Modifier.weight(1f)
+                            contentPadding = if (preferredExplorer != null) PaddingValues(horizontal = 10.dp, vertical = 8.dp) else ButtonDefaults.ContentPadding,
+                            modifier = if (preferredExplorer != null) Modifier else Modifier.weight(1f)
                         ) {
                             Icon(
                                 Icons.Default.ContentCopy,
@@ -529,13 +561,15 @@ fun GjallarMenuSheet(
                                 tint = Slate100,
                                 modifier = Modifier.size(16.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Copiar Ruta",
-                                color = Slate100,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp
-                            )
+                            if (preferredExplorer == null) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Copiar Ruta",
+                                    color = Slate100,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
                     }
 
@@ -820,6 +854,10 @@ fun GjallarMenuSheet(
     }
 
     if (showExplorerDialog) {
+        val installedExplorers = remember(showExplorerDialog) {
+            StorageHelper.getInstalledExplorers(context)
+        }
+
         AlertDialog(
             onDismissRequest = { showExplorerDialog = false },
             containerColor = Slate900,
@@ -838,15 +876,88 @@ fun GjallarMenuSheet(
                 }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
-                        text = "Elige con qué aplicación deseas explorar los audios guardados:",
+                        text = "Elige la aplicación con la que deseas explorar los audios guardados:",
                         fontSize = 12.sp,
                         color = Slate400,
-                        modifier = Modifier.padding(bottom = 6.dp)
+                        modifier = Modifier.padding(bottom = 4.dp)
                     )
 
-                    // Opción 1: Selector de aplicaciones instaladas
+                    // Gestores instalados detectados (Solid Explorer, Files, etc.)
+                    for (explorer in installedExplorers) {
+                        val isCurrentPreferred = explorer.packageName == preferredExplorer
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isCurrentPreferred) Slate800 else Slate850,
+                            border = BorderStroke(
+                                1.dp,
+                                if (isCurrentPreferred) GjallarCyan else Slate700
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (rememberChoice) {
+                                        StorageHelper.setPreferredExplorer(context, explorer.packageName)
+                                        preferredExplorer = explorer.packageName
+                                        preferredLabel = StorageHelper.getPreferredExplorerLabel(context)
+                                    }
+                                    showExplorerDialog = false
+                                    StorageHelper.openFolderWithPackage(context, explorer.packageName)
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    if (explorer.isSystem) Icons.Default.Folder else Icons.Default.Apps,
+                                    contentDescription = null,
+                                    tint = if (explorer.packageName.contains("solidexplorer")) GjallarAmber else if (explorer.isSystem) GjallarCyan else Slate300,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = explorer.name,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = Slate100
+                                        )
+                                        if (isCurrentPreferred) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(
+                                                color = GjallarCyan.copy(alpha = 0.2f),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Predeterminado",
+                                                    color = GjallarCyan,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Text(
+                                        text = if (explorer.isSystem) "Gestor del sistema" else explorer.packageName,
+                                        fontSize = 10.sp,
+                                        color = Slate400
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Selector genérico de Android
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = Slate850,
@@ -862,41 +973,16 @@ fun GjallarMenuSheet(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Apps, contentDescription = null, tint = GjallarCyan, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.OpenInNew, contentDescription = null, tint = Slate400, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
-                                Text("Elegir aplicación instalada", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Slate100)
-                                Text("Samsung, Xiaomi, Solid Explorer, etc.", fontSize = 10.sp, color = Slate400)
+                                Text("Otras aplicaciones instaladas...", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Slate100)
+                                Text("Mostrar selector completo de Android", fontSize = 10.sp, color = Slate400)
                             }
                         }
                     }
 
-                    // Opción 2: Gestor del sistema
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = Slate850,
-                        border = BorderStroke(1.dp, Slate700),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                showExplorerDialog = false
-                                StorageHelper.openSystemFiles(context)
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Folder, contentDescription = null, tint = GjallarAmber, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text("Explorador del Sistema", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Slate100)
-                                Text("Gestor predeterminado (Archivos / Files)", fontSize = 10.sp, color = Slate400)
-                            }
-                        }
-                    }
-
-                    // Opción 3: Copiar ruta
+                    // Copiar ruta al portapapeles
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = Slate850,
@@ -912,7 +998,7 @@ fun GjallarMenuSheet(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = null, tint = Slate300, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, tint = Slate400, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text("Copiar ruta al portapapeles", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Slate100)
@@ -920,12 +1006,59 @@ fun GjallarMenuSheet(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Casilla de verificación: Recordar elección
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { rememberChoice = !rememberChoice }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = rememberChoice,
+                            onCheckedChange = { rememberChoice = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = GjallarCyan,
+                                uncheckedColor = Slate500,
+                                checkmarkColor = Slate950
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Recordar mi elección para siempre",
+                            fontSize = 12.sp,
+                            color = Slate100,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { showExplorerDialog = false }) {
-                    Text("Cerrar", color = Slate400)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (preferredExplorer != null) {
+                        TextButton(
+                            onClick = {
+                                StorageHelper.setPreferredExplorer(context, null)
+                                preferredExplorer = null
+                                preferredLabel = null
+                            }
+                        ) {
+                            Text("Olvidar predeterminado", color = GjallarAmber, fontSize = 11.sp)
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(1.dp))
+                    }
+                    TextButton(onClick = { showExplorerDialog = false }) {
+                        Text("Cerrar", color = Slate400)
+                    }
                 }
             }
         )
