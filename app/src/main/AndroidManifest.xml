@@ -58,6 +58,14 @@
         <package android:name="au.com.shiftyjelly.pocketcasts" />
         <package android:name="com.podbean.app.podcast" />
         <package android:name="tunein.player" />
+
+        <!-- YouTube ReVanced, NewPipe y variantes mod -->
+        <package android:name="app.revanced.android.youtube" />
+        <package android:name="app.rvx.android.youtube" />
+        <package android:name="app.revanced.android.apps.youtube.music" />
+        <package android:name="app.rvx.android.apps.youtube.music" />
+        <package android:name="com.vanced.android.youtube" />
+        <package android:name="org.schabi.newpipe" />
     </queries>
 
     <application
@@ -82,6 +90,21 @@
             android:name=".feature.night.SleepTimerService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Administrador de dispositivo para apagar la pantalla cuando finaliza el temporizador -->
+        <receiver
+            android:name=".feature.night.GjallarDeviceAdminReceiver"
+            android:label="Gjallar Sleep Timer"
+            android:description="@string/app_name"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".feature.night.MediaNotificationListener"

@@ -2,6 +2,7 @@ package com.heimdall.gjallaraudio.feature.night
 
 import android.Manifest
 import android.app.TimePickerDialog
+import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -18,6 +19,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -348,14 +350,35 @@ private fun SleepTimerSection(
     remainingSeconds: Long
 ) {
     val context = LocalContext.current
+    val isFadingOut by SleepTimerService.isFadingOut.collectAsState()
+
     var selectedMinutes by remember { mutableStateOf(30L) }
     var fadeOutEnabled by remember { mutableStateOf(true) }
     var shakeToExtend by remember { mutableStateOf(true) }
     var smartSleepDetection by remember { mutableStateOf(true) }
     val scrollState = rememberScrollState()
 
+    val devicePolicyManager = remember { context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager }
+    val adminComponent = remember { GjallarDeviceAdminReceiver.getComponentName(context) }
+    var isDeviceAdminActive by remember { mutableStateOf(devicePolicyManager.isAdminActive(adminComponent)) }
+    var turnOffScreen by remember { mutableStateOf(true) }
+
+    val adminLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        isDeviceAdminActive = devicePolicyManager.isAdminActive(adminComponent)
+    }
+
     val mediaSessionInfo by MediaNotificationListener.currentSession.collectAsState()
     var streamingState by remember { mutableStateOf(StreamingAppDetector.detectPlaybackState(context)) }
+
+    var selectedAppPkg by remember {
+        mutableStateOf(
+            StreamingAppDetector.getPreferredApp(context)
+                ?: streamingState.detectedAppPackage
+                ?: "app.revanced.android.youtube"
+        )
+    }
 
     val startTimerAction = {
         val intent = Intent(context, SleepTimerService::class.java).apply {
@@ -364,6 +387,7 @@ private fun SleepTimerSection(
             putExtra(SleepTimerService.EXTRA_FADE_OUT_MINUTES, if (fadeOutEnabled) 2L else 0L)
             putExtra(SleepTimerService.EXTRA_SHAKE_TO_EXTEND, shakeToExtend)
             putExtra(SleepTimerService.EXTRA_SMART_SLEEP_DETECTION, smartSleepDetection)
+            putExtra(SleepTimerService.EXTRA_TURN_OFF_SCREEN, turnOffScreen)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)
@@ -411,16 +435,22 @@ private fun SleepTimerSection(
             ) {
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = if (isRunning) GjallarCyan.copy(alpha = 0.15f) else Slate800,
+                    color = if (isRunning && isFadingOut) GjallarAmber.copy(alpha = 0.15f)
+                            else if (isRunning) GjallarCyan.copy(alpha = 0.15f)
+                            else Slate800,
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
-                        if (isRunning) GjallarCyan else Slate700
+                        if (isRunning && isFadingOut) GjallarAmber
+                        else if (isRunning) GjallarCyan
+                        else Slate700
                     )
                 ) {
                     Text(
-                        text = if (isRunning) "ᛉ GUARDIÁN DE SUEÑO ACTIVO" else "ᛟ DURACIÓN DEL TEMPORIZADOR",
+                        text = if (isRunning && isFadingOut) "⚡ ATENUACIÓN SUAVE EN CURSO"
+                               else if (isRunning) "ᛉ GUARDIÁN DE SUEÑO ACTIVO"
+                               else "ᛟ DURACIÓN DEL TEMPORIZADOR",
                         fontSize = 11.sp,
-                        color = if (isRunning) GjallarCyan else Slate300,
+                        color = if (isRunning && isFadingOut) GjallarAmber else if (isRunning) GjallarCyan else Slate300,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -439,19 +469,20 @@ private fun SleepTimerSection(
                 }
 
                 Text(
-                    text = timeFormatted,
-                    fontSize = 58.sp,
+                    text = if (isRunning && isFadingOut) "00:${String.format("%02d", sec)}" else timeFormatted,
+                    fontSize = if (isRunning && isFadingOut) 52.sp else 58.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.sp,
-                    color = if (isRunning) GjallarCyan else Slate50,
+                    color = if (isRunning && isFadingOut) GjallarAmber else if (isRunning) GjallarCyan else Slate50,
                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                 )
 
                 Text(
-                    text = if (isRunning) "La música se atenuará y apagará al agotarse el tiempo"
+                    text = if (isRunning && isFadingOut) "Atenuando volumen al silencio (1 min). Tu volumen original quedará intacto."
+                           else if (isRunning) "La música se atenuará y apagará al agotarse el tiempo"
                            else "${selectedMinutes} minutos programados",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Slate400,
+                    color = if (isRunning && isFadingOut) GjallarAmber else Slate400,
                     textAlign = TextAlign.Center
                 )
 
@@ -682,10 +713,14 @@ private fun SleepTimerSection(
         }
 
         // ==========================================
-        // DETECTOR DE STREAMING Y ACCESO RÁPIDO
+        // DETECTOR DE STREAMING Y ACCESO RÁPIDO (YOUTUBE REVANCED, SPOTIFY, ETC.)
         // ==========================================
-        val targetPkg = streamingState.detectedAppPackage ?: streamingState.installedStreamingApps.firstOrNull()?.packageName
-        val targetName = streamingState.detectedAppName ?: streamingState.installedStreamingApps.firstOrNull()?.name
+        val allApps = streamingState.installedStreamingApps
+        val currentApp = allApps.firstOrNull { it.packageName == selectedAppPkg }
+            ?: allApps.firstOrNull()
+            ?: InstalledStreamingApp("app.revanced.android.youtube", "YouTube ReVanced")
+        val targetPkg = currentApp.packageName
+        val targetName = currentApp.name
 
         Card(
             colors = CardDefaults.cardColors(containerColor = Slate900),
@@ -711,7 +746,7 @@ private fun SleepTimerSection(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (streamingState.isMusicActive) "MÚSICA EN REPRODUCCIÓN" else "APP DE STREAMING",
+                            text = if (streamingState.isMusicActive) "REPRODUCIENDO AHORA" else "APP DE STREAMING PREFERIDA",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (streamingState.isMusicActive) GjallarCyan else Slate400,
@@ -747,84 +782,96 @@ private fun SleepTimerSection(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "${streamingState.trackArtist ?: ""} • ${targetName ?: "Streaming"}",
+                        text = "${streamingState.trackArtist ?: ""} • $targetName",
                         fontSize = 12.sp,
                         color = Slate400,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                } else if (targetName != null) {
-                    Text(
-                        text = targetName,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = Slate100
-                    )
-                    Text(
-                        text = if (streamingState.isMusicActive) "Reproduciendo audio en segundo plano" else "Acceso directo para volver a tu música tras configurar el temporizador",
-                        fontSize = 11.sp,
-                        color = Slate400
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
 
-                if (targetPkg != null) {
-                    val isSpotify = targetPkg.contains("spotify", ignoreCase = true)
-                    Button(
-                        onClick = {
-                            StreamingAppDetector.launchApp(context, targetPkg)
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isSpotify) Color(0xFF1DB954) else GjallarAmber,
-                            contentColor = Slate950
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = null,
-                            tint = Slate950,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Volver a $targetName",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
+                // Selector de apps con Chips desplazables
+                Text(
+                    text = "Selecciona la app para volver tras iniciar:",
+                    fontSize = 11.sp,
+                    color = Slate400,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
 
-                // Accesos a otras apps de streaming instaladas si hay más de una
-                val otherApps = streamingState.installedStreamingApps.filter { it.packageName != targetPkg }
-                if (otherApps.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        otherApps.take(3).forEach { app ->
-                            OutlinedButton(
-                                onClick = { StreamingAppDetector.launchApp(context, app.packageName) },
-                                shape = RoundedCornerShape(8.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Slate700),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                modifier = Modifier.weight(1f).height(32.dp)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(allApps) { app ->
+                        val isSelected = app.packageName == targetPkg
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) GjallarCyan.copy(alpha = 0.15f) else Slate850,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isSelected) GjallarCyan else Slate700
+                            ),
+                            modifier = Modifier.clickable {
+                                selectedAppPkg = app.packageName
+                                StreamingAppDetector.setPreferredApp(context, app.packageName)
+                            }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                             ) {
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Filled.Check,
+                                        contentDescription = null,
+                                        tint = GjallarCyan,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
                                 Text(
                                     text = app.name,
-                                    fontSize = 10.sp,
-                                    color = Slate300,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) GjallarCyan else Slate300
                                 )
                             }
                         }
                     }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Botón para volver a la app elegida (ej. YouTube ReVanced)
+                val isSpotify = targetPkg.contains("spotify", ignoreCase = true)
+                val isYouTube = targetPkg.contains("youtube", ignoreCase = true) || targetPkg.contains("revanced", ignoreCase = true)
+                Button(
+                    onClick = {
+                        StreamingAppDetector.launchApp(context, targetPkg)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSpotify) Color(0xFF1DB954) else if (isYouTube) Color(0xFFCC0000) else GjallarAmber,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "VOLVER A ${targetName.uppercase()}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
                 }
 
                 if (!streamingState.isNotificationAccessGranted) {
@@ -860,14 +907,15 @@ private fun SleepTimerSection(
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
+                // 1. Atenuación Suave Virtual
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Atenuación suave (Fade-out)", style = MaterialTheme.typography.titleMedium, color = Slate100)
-                        Text("Baja el volumen progresivamente en los últimos 2 minutos", style = MaterialTheme.typography.bodySmall, color = Slate400)
+                        Text("Atenuación suave virtual (1 minuto)", style = MaterialTheme.typography.titleMedium, color = Slate100)
+                        Text("Al llegar a 0, baja suavemente el volumen durante 1 min y pausa el audio, manteniendo tu volumen intacto", style = MaterialTheme.typography.bodySmall, color = Slate400)
                     }
                     Switch(
                         checked = fadeOutEnabled,
@@ -878,6 +926,62 @@ private fun SleepTimerSection(
 
                 HorizontalDivider(color = Slate800, modifier = Modifier.padding(vertical = 12.dp))
 
+                // 2. Apagado de Pantalla (Sleep Timer)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Apagar pantalla (Estilo Sleep Timer)", style = MaterialTheme.typography.titleMedium, color = Slate100)
+                        Text(
+                            text = if (isDeviceAdminActive) "Apagado y bloqueo inmediato de pantalla al terminar"
+                                   else "Requiere permiso de Administrador para apagar la pantalla",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isDeviceAdminActive) Slate400 else GjallarAmber
+                        )
+                    }
+                    Switch(
+                        checked = turnOffScreen,
+                        onCheckedChange = { checked ->
+                            turnOffScreen = checked
+                            if (checked && !isDeviceAdminActive) {
+                                try {
+                                    val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                                        putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
+                                        putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Gjallarhorn requiere este permiso exclusivamente para apagar y bloquear la pantalla al finalizar el temporizador de sueño.")
+                                    }
+                                    adminLauncher.launch(intent)
+                                } catch (_: Exception) {}
+                            }
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = GjallarCyan, checkedTrackColor = Slate850)
+                    )
+                }
+
+                if (turnOffScreen && !isDeviceAdminActive) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                                    putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
+                                    putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Gjallarhorn requiere este permiso exclusivamente para apagar y bloquear la pantalla al finalizar el temporizador de sueño.")
+                                }
+                                adminLauncher.launch(intent)
+                            } catch (_: Exception) {}
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, GjallarAmber),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text("Activar permiso de Administrador para apagar", color = GjallarAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                HorizontalDivider(color = Slate800, modifier = Modifier.padding(vertical = 12.dp))
+
+                // 3. Agitar para extender
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -896,6 +1000,7 @@ private fun SleepTimerSection(
 
                 HorizontalDivider(color = Slate800, modifier = Modifier.padding(vertical = 12.dp))
 
+                // 4. Detección Inteligente
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,

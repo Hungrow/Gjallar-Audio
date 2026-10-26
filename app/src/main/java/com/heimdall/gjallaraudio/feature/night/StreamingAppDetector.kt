@@ -25,9 +25,15 @@ data class StreamingPlaybackState(
 object StreamingAppDetector {
 
     val POPULAR_STREAMING_APPS = listOf(
+        "app.revanced.android.youtube" to "YouTube ReVanced",
+        "app.rvx.android.youtube" to "ReVanced Extended",
+        "app.revanced.android.apps.youtube.music" to "YT Music ReVanced",
+        "app.rvx.android.apps.youtube.music" to "YT Music Extended",
+        "com.google.android.youtube" to "YouTube",
+        "com.vanced.android.youtube" to "YouTube Vanced",
+        "org.schabi.newpipe" to "NewPipe",
         "com.spotify.music" to "Spotify",
         "com.google.android.apps.youtube.music" to "YouTube Music",
-        "com.google.android.youtube" to "YouTube",
         "com.apple.android.music" to "Apple Music",
         "com.amazon.mp3" to "Amazon Music",
         "com.audible.application" to "Audible",
@@ -39,6 +45,21 @@ object StreamingAppDetector {
         "com.podbean.app.podcast" to "Podbean",
         "tunein.player" to "TuneIn Radio"
     )
+
+    private const val PREFS_NAME = "gjallar_streaming_prefs"
+    private const val KEY_PREFERRED_PKG = "preferred_streaming_package"
+
+    fun getPreferredApp(context: Context): String? {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_PREFERRED_PKG, null)
+    }
+
+    fun setPreferredApp(context: Context, packageName: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_PREFERRED_PKG, packageName)
+            .apply()
+    }
 
     fun isNotificationAccessGranted(context: Context): Boolean {
         val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners") ?: return false
@@ -69,13 +90,42 @@ object StreamingAppDetector {
 
         val pm = context.packageManager
         val list = mutableListOf<InstalledStreamingApp>()
+        val seenPackages = mutableSetOf<String>()
+
         for ((pkg, defaultName) in POPULAR_STREAMING_APPS) {
             try {
                 val appInfo = pm.getApplicationInfo(pkg, 0)
                 val label = pm.getApplicationLabel(appInfo)?.toString() ?: defaultName
                 list.add(InstalledStreamingApp(packageName = pkg, name = label))
+                seenPackages.add(pkg)
             } catch (_: Exception) {}
         }
+
+        // Búsqueda dinámica de cualquier aplicación ReVanced o cliente mod instalado
+        try {
+            val installedPackages = pm.getInstalledApplications(0)
+            for (app in installedPackages) {
+                if (seenPackages.contains(app.packageName)) continue
+                val pkgLower = app.packageName.lowercase()
+                val label = pm.getApplicationLabel(app).toString()
+                val labelLower = label.lowercase()
+                if (pkgLower.contains("revanced") || pkgLower.contains("vanced") ||
+                    labelLower.contains("revanced") || labelLower.contains("vanced") ||
+                    labelLower.contains("newpipe") || labelLower.contains("innertune") ||
+                    labelLower.contains("vimusic")
+                ) {
+                    list.add(InstalledStreamingApp(packageName = app.packageName, name = label))
+                    seenPackages.add(app.packageName)
+                }
+            }
+        } catch (_: Exception) {}
+
+        // Garantizar que YouTube ReVanced esté siempre disponible entre las opciones para seleccionar
+        val hasReVanced = list.any { it.packageName.contains("revanced") || it.name.contains("ReVanced", ignoreCase = true) }
+        if (!hasReVanced) {
+            list.add(0, InstalledStreamingApp(packageName = "app.revanced.android.youtube", name = "YouTube ReVanced"))
+        }
+
         cachedStreamingApps = list
         return list
     }
@@ -85,6 +135,7 @@ object StreamingAppDetector {
         val isMusicActive = audioManager.isMusicActive
         val hasNotificationAccess = isNotificationAccessGranted(context)
         val installedApps = getInstalledStreamingApps(context)
+        val preferredPkg = getPreferredApp(context)
 
         // 1. Comprobar si tenemos información exacta del listener
         val session = MediaNotificationListener.currentSession.value
@@ -101,8 +152,9 @@ object StreamingAppDetector {
             )
         }
 
-        // 2. Si no hay sesión exacta pero hay música activa, buscar app instalada preferente
-        val targetApp = installedApps.firstOrNull()
+        // 2. Si hay app preferida por el usuario instalada (ej. YouTube ReVanced), priorizarla
+        val preferredApp = installedApps.firstOrNull { it.packageName == preferredPkg }
+        val targetApp = preferredApp ?: installedApps.firstOrNull()
 
         return StreamingPlaybackState(
             isMusicActive = isMusicActive,

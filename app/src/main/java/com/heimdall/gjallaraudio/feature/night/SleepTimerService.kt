@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.content.Intent
 import android.hardware.Sensor
@@ -45,24 +46,28 @@ class SleepTimerService : Service(), SensorEventListener {
         const val EXTRA_FADE_OUT_MINUTES = "EXTRA_FADE_OUT_MINUTES"
         const val EXTRA_SHAKE_TO_EXTEND = "EXTRA_SHAKE_TO_EXTEND"
         const val EXTRA_SMART_SLEEP_DETECTION = "EXTRA_SMART_SLEEP_DETECTION"
+        const val EXTRA_TURN_OFF_SCREEN = "EXTRA_TURN_OFF_SCREEN"
 
         private val _remainingSeconds = MutableStateFlow<Long>(0)
         val remainingSeconds: StateFlow<Long> = _remainingSeconds.asStateFlow()
 
         private val _isRunning = MutableStateFlow(false)
         val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
+
+        private val _isFadingOut = MutableStateFlow(false)
+        val isFadingOut: StateFlow<Boolean> = _isFadingOut.asStateFlow()
     }
 
     private var countDownTimer: CountDownTimer? = null
     private var totalSeconds: Long = 0
-    private var fadeOutDurationSeconds: Long = 120 // 2 minutes fade-out by default
     private var shakeEnabled = true
     private var smartSleepEnabled = false
+    private var turnOffScreen = true
     private var stillnessStartTime: Long = 0
 
     private lateinit var audioManager: AudioManager
     private var initialVolume: Int = 0
-    private var maxVolume: Int = 0
+    private var isFadingPhase: Boolean = false
 
     // Sensor Shake & Stillness detection
     private var sensorManager: SensorManager? = null
@@ -80,9 +85,9 @@ class SleepTimerService : Service(), SensorEventListener {
         when (intent?.action) {
             ACTION_START -> {
                 val duration = intent.getLongExtra(EXTRA_DURATION_SECONDS, 1800) // 30 min default
-                fadeOutDurationSeconds = intent.getLongExtra(EXTRA_FADE_OUT_MINUTES, 2) * 60
                 shakeEnabled = intent.getBooleanExtra(EXTRA_SHAKE_TO_EXTEND, true)
                 smartSleepEnabled = intent.getBooleanExtra(EXTRA_SMART_SLEEP_DETECTION, false)
+                turnOffScreen = intent.getBooleanExtra(EXTRA_TURN_OFF_SCREEN, true)
                 startTimer(duration)
             }
             ACTION_EXTEND -> {
@@ -99,17 +104,18 @@ class SleepTimerService : Service(), SensorEventListener {
         totalSeconds = durationSec
         _remainingSeconds.value = durationSec
         _isRunning.value = true
+        _isFadingOut.value = false
+        isFadingPhase = false
         stillnessStartTime = System.currentTimeMillis()
 
         initialVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
 
         // Adquirir WakeLock para evitar que el modo reposo / Doze de Android pause el temporizador con la pantalla apagada
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GjallarAudio:SleepTimerWakeLock").apply {
                 setReferenceCounted(false)
-                acquire((durationSec + 120) * 1000L)
+                acquire((durationSec + 180) * 1000L)
             }
         } catch (_: Exception) {}
 
@@ -143,19 +149,45 @@ class SleepTimerService : Service(), SensorEventListener {
 
     private fun runCountdown(durationSec: Long) {
         countDownTimer?.cancel()
+        isFadingPhase = false
+        _isFadingOut.value = false
+
         countDownTimer = object : CountDownTimer(durationSec * 1000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 val remaining = millisUntilFinished / 1000
                 _remainingSeconds.value = remaining
-
-                // Handle volume fade out
-                if (remaining <= fadeOutDurationSeconds && fadeOutDurationSeconds > 0) {
-                    val progress = remaining.toFloat() / fadeOutDurationSeconds.toFloat()
-                    val targetVolume = (initialVolume * progress).toInt().coerceAtLeast(0)
-                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
-                }
-
                 updateNotification(remaining)
+            }
+
+            override fun onFinish() {
+                // Al llegar a 0, comienza la atenuación de volumen virtual durante el siguiente minuto (60s)
+                startVirtualFadeOut()
+            }
+        }.start()
+    }
+
+    private fun startVirtualFadeOut() {
+        isFadingPhase = true
+        _isFadingOut.value = true
+        val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        if (currentVol > 0) {
+            initialVolume = currentVol
+        }
+
+        countDownTimer?.cancel()
+        countDownTimer = object : CountDownTimer(60_000, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                val remaining = millisUntilFinished / 1000
+                _remainingSeconds.value = remaining
+
+                // Atenuación suave progresiva a lo largo de 60 segundos
+                val progress = remaining.toFloat() / 60f
+                val targetVolume = (initialVolume * progress).toInt().coerceAtLeast(0)
+                try {
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
+                } catch (_: Exception) {}
+
+                updateNotificationFading(remaining)
             }
 
             override fun onFinish() {
@@ -165,27 +197,61 @@ class SleepTimerService : Service(), SensorEventListener {
     }
 
     private fun extendTimer(extraSeconds: Long) {
+        // Si estaba en fase de atenuación, restaurar el volumen del usuario
+        if (isFadingPhase && initialVolume > 0) {
+            try {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, initialVolume, 0)
+            } catch (_: Exception) {}
+        }
         val newDuration = _remainingSeconds.value + extraSeconds
         totalSeconds = newDuration
         runCountdown(newDuration)
     }
 
     private fun onTimerFinished() {
-        // 1. Detener toda reproducción multimedia (Spotify, YouTube, podcasts)
+        // 1. Detener toda reproducción multimedia activa (Spotify, YouTube, ReVanced, podcasts)
         pauseAllMedia()
 
-        // 2. Minimizar al escritorio / Home Screen para permitir el reposo y apagado natural de pantalla
+        // 2. Restaurar virtualmente el volumen del usuario intacto
         try {
-            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_HOME)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (initialVolume > 0) {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, initialVolume, 0)
             }
-            startActivity(homeIntent)
         } catch (_: Exception) {}
 
-        // 3. Vibración de confirmación
+        // 3. Apagado de pantalla (comportamiento idéntico a Sleep Timer)
+        if (turnOffScreen) {
+            try {
+                val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                val admin = GjallarDeviceAdminReceiver.getComponentName(this)
+                if (dpm.isAdminActive(admin)) {
+                    dpm.lockNow()
+                } else {
+                    // Si aún no ha activado el administrador de dispositivos, minimizar a Home
+                    val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_HOME)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(homeIntent)
+                }
+            } catch (_: Exception) {
+                val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_HOME)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(homeIntent)
+            }
+        }
+
+        // 4. Vibración de confirmación
         try {
-            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager
+                vibratorManager?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator?.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE))
             } else {
@@ -194,12 +260,12 @@ class SleepTimerService : Service(), SensorEventListener {
             }
         } catch (_: Exception) {}
 
-        // 4. Detener el servicio
+        // 5. Detener el servicio
         stopTimer()
     }
 
     private fun pauseAllMedia() {
-        // 1. Enviar eventos de teclado multimedia (PAUSE y STOP) para compatibilidad universal (Spotify, YT Music, etc.)
+        // 1. Enviar eventos de teclado multimedia (PAUSE y STOP) para compatibilidad universal
         try {
             val pauseDown = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE)
             val pauseUp = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE)
@@ -234,16 +300,17 @@ class SleepTimerService : Service(), SensorEventListener {
                 audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
             }
         } catch (_: Exception) {}
-
-        // 4. Silenciar volumen de música a 0 para garantizar silencio total
-        try {
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0)
-        } catch (_: Exception) {}
     }
 
     private fun stopTimer() {
         countDownTimer?.cancel()
         sensorManager?.unregisterListener(this)
+        // Restaurar volumen original si se cancela a medio fade
+        if (isFadingPhase && initialVolume > 0) {
+            try {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, initialVolume, 0)
+            } catch (_: Exception) {}
+        }
         wakeLock?.let {
             if (it.isHeld) {
                 try {
@@ -253,6 +320,7 @@ class SleepTimerService : Service(), SensorEventListener {
         }
         wakeLock = null
         _isRunning.value = false
+        _isFadingOut.value = false
         _remainingSeconds.value = 0
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -276,9 +344,9 @@ class SleepTimerService : Service(), SensorEventListener {
         } else if (smartSleepEnabled) {
             // Si el movimiento es casi nulo (gForce cerca de 1.0G = quieto en cama)
             if (kotlin.math.abs(gForce - 1.0) < 0.15) {
-                // Si lleva más de 5 minutos completamente quieto y faltan más de 2 minutos
-                if (now - stillnessStartTime > 300_000L && _remainingSeconds.value > fadeOutDurationSeconds) {
-                    _remainingSeconds.value = fadeOutDurationSeconds
+                // Si lleva más de 5 minutos completamente quieto y aún no está en fase de atenuación
+                if (now - stillnessStartTime > 300_000L && !isFadingPhase && _remainingSeconds.value > 10L) {
+                    startVirtualFadeOut()
                 }
             } else {
                 // Se movió
@@ -330,6 +398,45 @@ class SleepTimerService : Service(), SensorEventListener {
     private fun updateNotification(remainingSec: Long) {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.notify(NOTIFICATION_ID, buildNotification(remainingSec))
+    }
+
+    private fun updateNotificationFading(remainingFadeSec: Long) {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val timeFormatted = "${remainingFadeSec}s"
+
+        val openIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val extendIntent = PendingIntent.getService(
+            this, 1,
+            Intent(this, SleepTimerService::class.java).apply { action = ACTION_EXTEND },
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val stopIntent = PendingIntent.getService(
+            this, 2,
+            Intent(this, SleepTimerService::class.java).apply { action = ACTION_STOP },
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notif = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Gjallar Night — Atenuación suave ($timeFormatted)")
+            .setContentText("Atenuando el sonido hacia el descanso...")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentIntent(openIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addAction(android.R.drawable.ic_input_add, "+10 min", extendIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Detener", stopIntent)
+            .build()
+
+        manager.notify(NOTIFICATION_ID, notif)
     }
 
     private fun createNotificationChannel() {
