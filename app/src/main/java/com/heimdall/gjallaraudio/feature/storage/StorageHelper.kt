@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
+import android.os.StrictMode
 import android.widget.Toast
 import java.io.File
 
@@ -142,29 +143,58 @@ object StorageHelper {
 
         copyPathToClipboard(context, showToast = false)
 
+        // Relajar VM policy para permitir pasar Uri de archivo real al explorador de archivos
         try {
-            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Music%2FGjallarAudio")
+            val builder = StrictMode.VmPolicy.Builder()
+            StrictMode.setVmPolicy(builder.build())
+        } catch (_: Exception) {}
+
+        val fileUri = Uri.fromFile(gjallarDir)
+
+        // Intento 1: Solid Explorer y exploradores de archivos con tipo "resource/folder"
+        try {
             val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "vnd.android.document/directory")
+                setDataAndType(fileUri, "resource/folder")
                 setPackage(packageName)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
             context.startActivity(intent)
             return
-        } catch (_: Exception) {
-            // Intento 2: Iniciar la app directamente
-            try {
-                val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-                if (launchIntent != null) {
-                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(launchIntent)
-                    Toast.makeText(context, "Abriendo gestor (Ruta copiada al portapapeles)", Toast.LENGTH_SHORT).show()
-                    return
-                }
-            } catch (_: Exception) {}
-        }
+        } catch (_: Exception) {}
 
-        // Intento 3: Fallback a explorador del sistema
+        // Intento 2: Solid Explorer y exploradores con tipo "*/*"
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(fileUri, "*/*")
+                setPackage(packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            context.startActivity(intent)
+            return
+        } catch (_: Exception) {}
+
+        // Intento 3: Tipo directorio estándar
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(fileUri, "vnd.android.document/directory")
+                setPackage(packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            context.startActivity(intent)
+            return
+        } catch (_: Exception) {}
+
+        // Intento 4: Iniciar la app directamente
+        try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(launchIntent)
+                Toast.makeText(context, "Ruta copiada al portapapeles: Music/GjallarAudio", Toast.LENGTH_SHORT).show()
+                return
+            }
+        } catch (_: Exception) {}
+
         openSystemFiles(context)
     }
 

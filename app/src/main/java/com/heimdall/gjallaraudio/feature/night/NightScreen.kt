@@ -1,11 +1,16 @@
 package com.heimdall.gjallaraudio.feature.night
 
+import android.Manifest
 import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.AlarmClock
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -352,6 +357,28 @@ private fun SleepTimerSection(
     val mediaSessionInfo by MediaNotificationListener.currentSession.collectAsState()
     var streamingState by remember { mutableStateOf(StreamingAppDetector.detectPlaybackState(context)) }
 
+    val startTimerAction = {
+        val intent = Intent(context, SleepTimerService::class.java).apply {
+            action = SleepTimerService.ACTION_START
+            putExtra(SleepTimerService.EXTRA_DURATION_SECONDS, selectedMinutes * 60)
+            putExtra(SleepTimerService.EXTRA_FADE_OUT_MINUTES, if (fadeOutEnabled) 2L else 0L)
+            putExtra(SleepTimerService.EXTRA_SHAKE_TO_EXTEND, shakeToExtend)
+            putExtra(SleepTimerService.EXTRA_SMART_SLEEP_DETECTION, smartSleepDetection)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
+        Toast.makeText(context, "Temporizador de $selectedMinutes min activado", Toast.LENGTH_SHORT).show()
+    }
+
+    val notificationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        startTimerAction()
+    }
+
     LaunchedEffect(Unit) {
         while (true) {
             streamingState = StreamingAppDetector.detectPlaybackState(context)
@@ -555,19 +582,16 @@ private fun SleepTimerSection(
         if (!isRunning) {
             Button(
                 onClick = {
-                    val intent = Intent(context, SleepTimerService::class.java).apply {
-                        action = SleepTimerService.ACTION_START
-                        putExtra(SleepTimerService.EXTRA_DURATION_SECONDS, selectedMinutes * 60)
-                        putExtra(SleepTimerService.EXTRA_FADE_OUT_MINUTES, if (fadeOutEnabled) 2L else 0L)
-                        putExtra(SleepTimerService.EXTRA_SHAKE_TO_EXTEND, shakeToExtend)
-                        putExtra(SleepTimerService.EXTRA_SMART_SLEEP_DETECTION, smartSleepDetection)
-                    }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        context.startForegroundService(intent)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     } else {
-                        context.startService(intent)
+                        startTimerAction()
                     }
-                    Toast.makeText(context, "Temporizador de $selectedMinutes min activado", Toast.LENGTH_SHORT).show()
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = GjallarCyan,

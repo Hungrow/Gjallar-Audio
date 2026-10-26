@@ -18,9 +18,14 @@ import android.os.Build
 import android.os.CountDownTimer
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.KeyEvent
+import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.heimdall.gjallaraudio.MainActivity
+import com.heimdall.gjallaraudio.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -115,7 +120,24 @@ class SleepTimerService : Service(), SensorEventListener {
             }
         }
 
-        startForeground(NOTIFICATION_ID, buildNotification(durationSec))
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    buildNotification(durationSec),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification(durationSec))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            try {
+                startForeground(NOTIFICATION_ID, buildNotification(durationSec))
+            } catch (_: Exception) {}
+        }
+
         runCountdown(durationSec)
     }
 
@@ -149,9 +171,30 @@ class SleepTimerService : Service(), SensorEventListener {
     }
 
     private fun onTimerFinished() {
-        // Stop audio playback globally (pauses Spotify, YouTube, etc.)
+        // 1. Detener toda reproducción multimedia (Spotify, YouTube, podcasts)
         pauseAllMedia()
 
+        // 2. Minimizar al escritorio / Home Screen para permitir el reposo y apagado natural de pantalla
+        try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(homeIntent)
+        } catch (_: Exception) {}
+
+        // 3. Vibración de confirmación
+        try {
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(300)
+            }
+        } catch (_: Exception) {}
+
+        // 4. Detener el servicio
         stopTimer()
     }
 
@@ -272,10 +315,13 @@ class SleepTimerService : Service(), SensorEventListener {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Gjallar Night — Apagado en $timeFormatted")
             .setContentText("Atenuando el sonido hacia el descanso...")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(openIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(android.R.drawable.ic_input_add, "+10 min", extendIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Detener", stopIntent)
             .build()
@@ -290,10 +336,13 @@ class SleepTimerService : Service(), SensorEventListener {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Gjallar Sleep Timer",
-                NotificationManager.IMPORTANCE_LOW
+                "Temporizador de Apagado Gjallar",
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "Notificaciones activas de cuenta atrás y descanso nocturno"
+                setShowBadge(true)
+                setSound(null, null)
+                enableVibration(false)
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
