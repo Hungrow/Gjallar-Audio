@@ -3,6 +3,7 @@ package com.heimdall.gjallaraudio.feature.night
 import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.AlarmClock
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +31,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.heimdall.gjallaraudio.ui.theme.*
@@ -346,6 +349,16 @@ private fun SleepTimerSection(
     var smartSleepDetection by remember { mutableStateOf(true) }
     val scrollState = rememberScrollState()
 
+    val mediaSessionInfo by MediaNotificationListener.currentSession.collectAsState()
+    var streamingState by remember { mutableStateOf(StreamingAppDetector.detectPlaybackState(context)) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            streamingState = StreamingAppDetector.detectPlaybackState(context)
+            kotlinx.coroutines.delay(2000)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -549,7 +562,12 @@ private fun SleepTimerSection(
                         putExtra(SleepTimerService.EXTRA_SHAKE_TO_EXTEND, shakeToExtend)
                         putExtra(SleepTimerService.EXTRA_SMART_SLEEP_DETECTION, smartSleepDetection)
                     }
-                    context.startService(intent)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(intent)
+                    } else {
+                        context.startService(intent)
+                    }
+                    Toast.makeText(context, "Temporizador de $selectedMinutes min activado", Toast.LENGTH_SHORT).show()
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = GjallarCyan,
@@ -634,6 +652,166 @@ private fun SleepTimerSection(
                         fontWeight = FontWeight.Bold,
                         color = GjallarCyan,
                         fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
+        // ==========================================
+        // DETECTOR DE STREAMING Y ACCESO RÁPIDO
+        // ==========================================
+        val targetPkg = streamingState.detectedAppPackage ?: streamingState.installedStreamingApps.firstOrNull()?.packageName
+        val targetName = streamingState.detectedAppName ?: streamingState.installedStreamingApps.firstOrNull()?.name
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Slate900),
+            shape = RoundedCornerShape(16.dp),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (streamingState.isMusicActive) GjallarCyan else Slate800
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.GraphicEq,
+                            contentDescription = null,
+                            tint = if (streamingState.isMusicActive) GjallarCyan else Slate400,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (streamingState.isMusicActive) "MÚSICA EN REPRODUCCIÓN" else "APP DE STREAMING",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (streamingState.isMusicActive) GjallarCyan else Slate400,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+
+                    if (streamingState.isMusicActive) {
+                        Surface(
+                            color = GjallarCyan.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "EN CURSO",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GjallarCyan,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (streamingState.trackTitle != null) {
+                    Text(
+                        text = streamingState.trackTitle!!,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Slate100,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${streamingState.trackArtist ?: ""} • ${targetName ?: "Streaming"}",
+                        fontSize = 12.sp,
+                        color = Slate400,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                } else if (targetName != null) {
+                    Text(
+                        text = targetName,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = Slate100
+                    )
+                    Text(
+                        text = if (streamingState.isMusicActive) "Reproduciendo audio en segundo plano" else "Acceso directo para volver a tu música tras configurar el temporizador",
+                        fontSize = 11.sp,
+                        color = Slate400
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                if (targetPkg != null) {
+                    val isSpotify = targetPkg.contains("spotify", ignoreCase = true)
+                    Button(
+                        onClick = {
+                            StreamingAppDetector.launchApp(context, targetPkg)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSpotify) Color(0xFF1DB954) else GjallarAmber,
+                            contentColor = Slate950
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = null,
+                            tint = Slate950,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Volver a $targetName",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+
+                // Accesos a otras apps de streaming instaladas si hay más de una
+                val otherApps = streamingState.installedStreamingApps.filter { it.packageName != targetPkg }
+                if (otherApps.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        otherApps.take(3).forEach { app ->
+                            OutlinedButton(
+                                onClick = { StreamingAppDetector.launchApp(context, app.packageName) },
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Slate700),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.weight(1f).height(32.dp)
+                            ) {
+                                Text(
+                                    text = app.name,
+                                    fontSize = 10.sp,
+                                    color = Slate300,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (!streamingState.isNotificationAccessGranted) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "ℹ️ Conceder permiso para ver el título exacto de la canción que suena",
+                        fontSize = 10.sp,
+                        color = Slate500,
+                        modifier = Modifier.clickable {
+                            StreamingAppDetector.openNotificationAccessSettings(context)
+                        }
                     )
                 }
             }

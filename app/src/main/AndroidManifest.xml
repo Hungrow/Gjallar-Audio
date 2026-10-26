@@ -43,6 +43,21 @@
         <package android:name="nextapp.fx" />
         <package android:name="com.amaze.filemanager" />
         <package android:name="me.zhanghai.android.files" />
+
+        <!-- Apps de música y streaming para detección y retorno rápido -->
+        <package android:name="com.spotify.music" />
+        <package android:name="com.google.android.apps.youtube.music" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.apple.android.music" />
+        <package android:name="com.amazon.mp3" />
+        <package android:name="com.audible.application" />
+        <package android:name="com.ivoox.app" />
+        <package android:name="deezer.android.app" />
+        <package android:name="com.aspiro.tidal" />
+        <package android:name="com.soundcloud.android" />
+        <package android:name="au.com.shiftyjelly.pocketcasts" />
+        <package android:name="com.podbean.app.podcast" />
+        <package android:name="tunein.player" />
     </queries>
 
     <application
@@ -67,6 +82,16 @@
             android:name=".feature.night.SleepTimerService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <service
+            android:name=".feature.night.MediaNotificationListener"
+            android:label="Control de Streaming Gjallar"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

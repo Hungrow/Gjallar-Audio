@@ -17,6 +17,8 @@ import android.media.AudioManager
 import android.os.Build
 import android.os.CountDownTimer
 import android.os.IBinder
+import android.os.PowerManager
+import android.view.KeyEvent
 import androidx.core.app.NotificationCompat
 import com.heimdall.gjallaraudio.MainActivity
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,6 +62,7 @@ class SleepTimerService : Service(), SensorEventListener {
     // Sensor Shake & Stillness detection
     private var sensorManager: SensorManager? = null
     private var lastShakeTime: Long = 0
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -95,6 +98,15 @@ class SleepTimerService : Service(), SensorEventListener {
 
         initialVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+
+        // Adquirir WakeLock para evitar que el modo reposo / Doze de Android pause el temporizador con la pantalla apagada
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GjallarAudio:SleepTimerWakeLock").apply {
+                setReferenceCounted(false)
+                acquire((durationSec + 120) * 1000L)
+            }
+        } catch (_: Exception) {}
 
         if (shakeEnabled || smartSleepEnabled) {
             val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
@@ -144,27 +156,59 @@ class SleepTimerService : Service(), SensorEventListener {
     }
 
     private fun pauseAllMedia() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build()
-                )
-                .build()
-            audioManager.requestAudioFocus(focusRequest)
-            // Immediately abandon to leave system silent
-            audioManager.abandonAudioFocusRequest(focusRequest)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-        }
+        // 1. Enviar eventos de teclado multimedia (PAUSE y STOP) para compatibilidad universal (Spotify, YT Music, etc.)
+        try {
+            val pauseDown = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE)
+            val pauseUp = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE)
+            audioManager.dispatchMediaKeyEvent(pauseDown)
+            audioManager.dispatchMediaKeyEvent(pauseUp)
+
+            val stopDown = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_STOP)
+            val stopUp = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_STOP)
+            audioManager.dispatchMediaKeyEvent(stopDown)
+            audioManager.dispatchMediaKeyEvent(stopUp)
+        } catch (_: Exception) {}
+
+        // 2. Control directo de sesiones activas (MediaSession) si el listener tiene acceso
+        try {
+            MediaNotificationListener.pauseAll(this)
+        } catch (_: Exception) {}
+
+        // 3. Audio Focus GAIN permanente: notifica pérdida de foco definitiva a reproductores externos
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build()
+                    )
+                    .build()
+                audioManager.requestAudioFocus(focusRequest)
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+            }
+        } catch (_: Exception) {}
+
+        // 4. Silenciar volumen de música a 0 para garantizar silencio total
+        try {
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0, 0)
+        } catch (_: Exception) {}
     }
 
     private fun stopTimer() {
         countDownTimer?.cancel()
         sensorManager?.unregisterListener(this)
+        wakeLock?.let {
+            if (it.isHeld) {
+                try {
+                    it.release()
+                } catch (_: Exception) {}
+            }
+        }
+        wakeLock = null
         _isRunning.value = false
         _remainingSeconds.value = 0
         stopForeground(STOP_FOREGROUND_REMOVE)

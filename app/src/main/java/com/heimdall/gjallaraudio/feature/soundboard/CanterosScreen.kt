@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
@@ -82,12 +83,20 @@ fun CanterosScreen(
     var onlineResults by remember { mutableStateOf<List<MyInstantsResult>>(emptyList()) }
     var isSearchingOnline by remember { mutableStateOf(false) }
     var downloadingIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var onlinePage by remember { mutableStateOf(1) }
+    var hasMoreOnline by remember { mutableStateOf(true) }
+    var isLoadingMore by remember { mutableStateOf(false) }
+    var onlineTotalCount by remember { mutableStateOf(0) }
 
-    // Cargar tendencias iniciales al abrir tab online
+    // Cargar lote amplio de sonidos al abrir tab online (30 sonidos iniciales)
     LaunchedEffect(selectedMainTab) {
         if (selectedMainTab == SoundboardTab.ONLINE && onlineResults.isEmpty()) {
             isSearchingOnline = true
-            onlineResults = MyInstantsClient.search("")
+            val page = MyInstantsClient.fetchInitialBatch("", pagesCount = 3)
+            onlineResults = page.results
+            onlinePage = page.nextPage ?: 4
+            hasMoreOnline = page.hasNext
+            onlineTotalCount = page.totalCount
             isSearchingOnline = false
         }
     }
@@ -279,7 +288,11 @@ fun CanterosScreen(
                                 onlineSearchQuery = ""
                                 coroutineScope.launch {
                                     isSearchingOnline = true
-                                    onlineResults = MyInstantsClient.search("")
+                                    val page = MyInstantsClient.fetchInitialBatch("", 3)
+                                    onlineResults = page.results
+                                    onlinePage = page.nextPage ?: 4
+                                    hasMoreOnline = page.hasNext
+                                    onlineTotalCount = page.totalCount
                                     isSearchingOnline = false
                                 }
                             }) {
@@ -289,7 +302,11 @@ fun CanterosScreen(
                         IconButton(onClick = {
                             coroutineScope.launch {
                                 isSearchingOnline = true
-                                onlineResults = MyInstantsClient.search(onlineSearchQuery)
+                                val page = MyInstantsClient.fetchInitialBatch(onlineSearchQuery, 3)
+                                onlineResults = page.results
+                                onlinePage = page.nextPage ?: 4
+                                hasMoreOnline = page.hasNext
+                                onlineTotalCount = page.totalCount
                                 isSearchingOnline = false
                             }
                         }) {
@@ -314,32 +331,48 @@ fun CanterosScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Chips rápidos de búsqueda online
+            // Chips rápidos de búsqueda y categorías para explorar el inmenso catálogo
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                listOf("Top Memes", "Risas", "Aplausos", "Bruh", "Anime", "Gritos", "Torrente", "Ibai").forEach { tag ->
+                listOf(
+                    "🔥 Populares" to "",
+                    "🇪🇸 En Español" to "español",
+                    "😂 Memes" to "meme",
+                    "📢 Simpsons" to "simpson",
+                    "🎮 Juegos" to "game",
+                    "💥 Efectos" to "sound",
+                    "🎬 Cine" to "movie",
+                    "🥋 Anime" to "anime",
+                    "👏 Aplausos" to "aplausos",
+                    "🔊 Risas" to "risas",
+                    "💀 Bruh" to "bruh"
+                ).forEach { (label, q) ->
+                    val isSelected = (q.isEmpty() && onlineSearchQuery.isEmpty()) || (q.isNotEmpty() && onlineSearchQuery == q)
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = Slate900,
-                        border = BorderStroke(1.dp, Slate800),
+                        color = if (isSelected) Slate800 else Slate900,
+                        border = BorderStroke(1.dp, if (isSelected) GjallarAmber else Slate800),
                         modifier = Modifier.clickable {
-                            val q = if (tag == "Top Memes") "" else tag
                             onlineSearchQuery = q
                             coroutineScope.launch {
                                 isSearchingOnline = true
-                                onlineResults = MyInstantsClient.search(q)
+                                val page = MyInstantsClient.fetchInitialBatch(q, 3)
+                                onlineResults = page.results
+                                onlinePage = page.nextPage ?: 4
+                                hasMoreOnline = page.hasNext
+                                onlineTotalCount = page.totalCount
                                 isSearchingOnline = false
                             }
                         }
                     ) {
                         Text(
-                            text = tag,
+                            text = label,
                             fontSize = 11.sp,
-                            color = Slate300,
+                            color = if (isSelected) GjallarAmber else Slate300,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                         )
                     }
@@ -468,6 +501,47 @@ fun CanterosScreen(
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    if (hasMoreOnline) {
+                        item(span = { GridItemSpan(2) }) {
+                            Button(
+                                onClick = {
+                                    if (!isLoadingMore && hasMoreOnline) {
+                                        isLoadingMore = true
+                                        coroutineScope.launch {
+                                            val page = MyInstantsClient.fetchPage(onlineSearchQuery, onlinePage)
+                                            onlineResults = (onlineResults + page.results).distinctBy { it.slug + it.soundUrl }
+                                            onlinePage = page.nextPage ?: (onlinePage + 1)
+                                            hasMoreOnline = page.hasNext
+                                            isLoadingMore = false
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Slate850),
+                                border = BorderStroke(1.dp, GjallarAmber),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp)
+                                    .height(46.dp)
+                            ) {
+                                if (isLoadingMore) {
+                                    CircularProgressIndicator(color = GjallarAmber, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Cargando catálogo...", color = GjallarAmber, fontSize = 12.sp)
+                                } else {
+                                    Icon(Icons.Filled.Refresh, contentDescription = null, tint = GjallarAmber, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Cargar más sonidos (${onlineResults.size} mostrados)",
+                                        color = Slate100,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
                                 }
                             }
                         }
