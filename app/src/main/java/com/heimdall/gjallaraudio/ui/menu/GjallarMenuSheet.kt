@@ -330,6 +330,9 @@ fun GjallarMenuSheet(
                                                         onProgress = { p ->
                                                             updateStatus = UpdateStatus.Downloading(p)
                                                         },
+                                                        onReadyToInstall = { apk ->
+                                                            updateStatus = UpdateStatus.ReadyToInstall(apk)
+                                                        },
                                                         onError = { err ->
                                                             updateStatus = UpdateStatus.Error(err)
                                                         }
@@ -405,6 +408,65 @@ fun GjallarMenuSheet(
                                             text = "Al terminar, se abrirá el instalador. No ocupará espacio en tu carpeta Descargas.",
                                             fontSize = 10.sp,
                                             color = Slate300
+                                        )
+                                    }
+                                }
+                            }
+                            is UpdateStatus.ReadyToInstall -> {
+                                Surface(
+                                    color = Color(0xFF064E3B).copy(alpha = 0.35f),
+                                    border = BorderStroke(1.dp, Color(0xFF10B981)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                tint = Color(0xFF34D399),
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "¡Descarga completada!",
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF34D399),
+                                                fontSize = 13.sp
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Button(
+                                            onClick = {
+                                                GitHubUpdateChecker.installApk(context, status.apkFile)
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(
+                                                Icons.Default.SystemUpdate,
+                                                contentDescription = null,
+                                                tint = Slate950,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "Abrir Instalador de Android",
+                                                fontWeight = FontWeight.Bold,
+                                                color = Slate950,
+                                                fontSize = 13.sp
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "Si Android te pide confirmación, pulsa en Ajustes y activa 'Permitir desde esta fuente'.",
+                                            fontSize = 10.sp,
+                                            color = Slate300,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
                                         )
                                     }
                                 }

@@ -3,6 +3,9 @@ package com.heimdall.gjallaraudio.feature.updater
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.heimdall.gjallaraudio.BuildConfig
 import kotlinx.coroutines.Dispatchers
@@ -113,6 +116,7 @@ object GitHubUpdateChecker {
         context: Context,
         downloadUrl: String,
         onProgress: (Float) -> Unit,
+        onReadyToInstall: (File) -> Unit,
         onError: (String) -> Unit
     ) = withContext(Dispatchers.IO) {
         try {
@@ -136,13 +140,17 @@ object GitHubUpdateChecker {
             }
 
             val totalBytes = body.contentLength()
-            // Descargar en caché interna para NO ensuciar la carpeta Descargas
-            val updateFile = File(context.cacheDir, "gjallar_update.apk")
-            if (updateFile.exists()) updateFile.delete()
+            
+            // Usar directorio externalFilesDir/updates para compatibilidad total con el PackageInstaller de Android
+            val updateDir = File(context.getExternalFilesDir(null), "updates")
+            if (!updateDir.exists()) updateDir.mkdirs()
+            updateDir.listFiles()?.forEach { it.delete() }
+
+            val updateFile = File(updateDir, "gjallar_update.apk")
 
             body.byteStream().use { input ->
                 FileOutputStream(updateFile).use { output ->
-                    val buffer = ByteArray(16 * 1024)
+                    val buffer = ByteArray(32 * 1024)
                     var bytesRead: Int
                     var totalRead = 0L
 
@@ -161,6 +169,7 @@ object GitHubUpdateChecker {
             }
 
             withContext(Dispatchers.Main) {
+                onReadyToInstall(updateFile)
                 installApk(context, updateFile)
             }
         } catch (e: Exception) {
@@ -170,7 +179,47 @@ object GitHubUpdateChecker {
         }
     }
 
+    fun canInstallApk(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.packageManager.canRequestPackageInstalls()
+        } else {
+            true
+        }
+    }
+
+    fun requestInstallPermission(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                Toast.makeText(
+                    context,
+                    "Por favor, activa 'Permitir desde esta fuente' para GjallarAudio",
+                    Toast.LENGTH_LONG
+                ).show()
+            } catch (_: Exception) {
+                val intent = Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            }
+        }
+    }
+
     fun installApk(context: Context, apkFile: File) {
+        if (!apkFile.exists()) {
+            Toast.makeText(context, "El archivo descargado no existe", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (!canInstallApk(context)) {
+            requestInstallPermission(context)
+            return
+        }
+
         try {
             val apkUri = FileProvider.getUriForFile(
                 context,
@@ -185,6 +234,7 @@ object GitHubUpdateChecker {
             context.startActivity(intent)
         } catch (e: Exception) {
             e.printStackTrace()
+            Toast.makeText(context, "Error al iniciar instalador: ${e.message}", Toast.LENGTH_SHORT).show()
             openDownloadUrl(context, "https://github.com/$GITHUB_REPO/releases/latest")
         }
     }
