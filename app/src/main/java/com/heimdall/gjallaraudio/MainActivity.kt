@@ -37,6 +37,15 @@ import com.heimdall.gjallaraudio.ui.theme.*
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Limpieza automática del instalador de actualización temporal (0 MB en almacenamiento)
+        try {
+            val updateFile = java.io.File(cacheDir, "gjallar_update.apk")
+            if (updateFile.exists()) {
+                updateFile.delete()
+            }
+        } catch (_: Exception) {}
+
         enableEdgeToEdge()
         setContent {
             GjallarAudioTheme {

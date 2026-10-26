@@ -91,8 +91,16 @@ object CanterosCatalog {
         CanterosSound("rainier_1", "¡Mis ojos!", "Otros", "canteros/Rainier Wolfcastle/mis_ojos.mp3", "¡Mis ojos! ¡Las gafas no hacen nada!"),
         CanterosSound("rainier_2", "¡Vámonos, átomos!", "Otros", "canteros/Rainier Wolfcastle/vamonos_atomos.mp3", "¡Vámonos, átomos!"),
         CanterosSound("apu_1", "Adiós al Badulaque", "Apu", "canteros/Apu/adios_badulaque.mp3", "¿Quién necesita el Badulaque? Yo no..."),
-        CanterosSound("nick_1", "¡Hola Doctor Nick!", "Otros", "canteros/Doctor Nick/hola_dr_nick.mp3", "¡Hola a todo el mundo! ¡Hola Doctor Nick!")
+        CanterosSound("nick_1", "¡Hola Doctor Nick!", "Otros", "canteros/Doctor Nick/hola_dr_nick.mp3", "¡Hola a todo el mundo! ¡Hola Doctor Nick!"),
+        CanterosSound("smithers_1", "El sombrero es nuevo", "Smithers", "canteros/Smithers/pero_sombrero_nuevo.mp3", "¡Pero el sombrero es nuevo!"),
+        CanterosSound("burns_5", "Excelente Zutroy", "Burns", "canteros/Burns/excelente_zutroy.mp3", "Excelente, Zutroy..."),
+        CanterosSound("homer_12", "Con erótico resultado", "Homer", "canteros/Homer/con_erotico.mp3", "Con erótico resultado..."),
+        CanterosSound("homer_13", "Dinosaurio inamovible", "Homer", "canteros/Homer/dinosaurio_inamobible.mp3", "Es como un dinosaurio inamovible..."),
+        CanterosSound("ralph_6", "El duende me dijo", "Ralph", "canteros/Ralph Wiggum/me_dijo_quemara.mp3", "El duende me dijo que quemara cosas."),
+        CanterosSound("otros_13", "Farfalla vendetta", "Otros", "canteros/Otros/farfalla_vendetta.mp3", "Farfalla vendetta..."),
+        CanterosSound("otros_14", "Si una vaca pudiera", "Otros", "canteros/Otros/si_vaca_oportunidad.mp3", "Si una vaca tuviera la oportunidad te comería a ti y a todos los que quieres."),
+        CanterosSound("otros_15", "Lágrimas deliciosas", "Otros", "canteros/Otros/sus_lagrimas_real.mp3", "¡Mmm, sus lágrimas son deliciosas!")
     )
 
-    val categories = listOf("Todos", "Canteros", "Homer", "Flanders", "Moe", "Nelson", "Milhouse", "Ralph", "Burns", "Abuelo", "Bart", "Skinner", "Willie", "Otros")
+    val categories = listOf("Todos", "Canteros", "Homer", "Flanders", "Moe", "Nelson", "Milhouse", "Ralph", "Burns", "Abuelo", "Bart", "Skinner", "Willie", "Smithers", "Otros")
 }

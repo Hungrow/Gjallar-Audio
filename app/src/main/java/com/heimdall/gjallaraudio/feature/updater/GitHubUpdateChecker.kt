@@ -3,12 +3,15 @@ package com.heimdall.gjallaraudio.feature.updater
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.FileProvider
 import com.heimdall.gjallaraudio.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
 sealed class UpdateStatus {
@@ -22,6 +25,8 @@ sealed class UpdateStatus {
         val downloadUrl: String,
         val apkSizeMb: Float
     ) : UpdateStatus()
+    data class Downloading(val progress: Float) : UpdateStatus()
+    data class ReadyToInstall(val apkFile: File) : UpdateStatus()
     data class Error(val message: String) : UpdateStatus()
 }
 
@@ -30,8 +35,8 @@ object GitHubUpdateChecker {
     private const val LATEST_RELEASE_API = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
     suspend fun checkForUpdates(): UpdateStatus = withContext(Dispatchers.IO) {
@@ -101,6 +106,86 @@ object GitHubUpdateChecker {
             }
         } catch (e: Exception) {
             UpdateStatus.Error("Error de conexión: ${e.localizedMessage ?: "No se pudo conectar a GitHub"}")
+        }
+    }
+
+    suspend fun downloadAndInstall(
+        context: Context,
+        downloadUrl: String,
+        onProgress: (Float) -> Unit,
+        onError: (String) -> Unit
+    ) = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url(downloadUrl)
+                .header("User-Agent", "GjallarAudio-App")
+                .get()
+                .build()
+
+            val response = httpClient.newCall(request).execute()
+            if (!response.isSuccessful) {
+                withContext(Dispatchers.Main) {
+                    onError("Fallo al descargar actualización (HTTP ${response.code})")
+                }
+                return@withContext
+            }
+
+            val body = response.body ?: run {
+                withContext(Dispatchers.Main) { onError("Respuesta vacía del servidor") }
+                return@withContext
+            }
+
+            val totalBytes = body.contentLength()
+            // Descargar en caché interna para NO ensuciar la carpeta Descargas
+            val updateFile = File(context.cacheDir, "gjallar_update.apk")
+            if (updateFile.exists()) updateFile.delete()
+
+            body.byteStream().use { input ->
+                FileOutputStream(updateFile).use { output ->
+                    val buffer = ByteArray(16 * 1024)
+                    var bytesRead: Int
+                    var totalRead = 0L
+
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                        totalRead += bytesRead
+                        if (totalBytes > 0) {
+                            val progress = totalRead.toFloat() / totalBytes.toFloat()
+                            withContext(Dispatchers.Main) {
+                                onProgress(progress)
+                            }
+                        }
+                    }
+                    output.flush()
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                installApk(context, updateFile)
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                onError("Fallo durante la descarga: ${e.localizedMessage ?: "Error desconocido"}")
+            }
+        }
+    }
+
+    fun installApk(context: Context, apkFile: File) {
+        try {
+            val apkUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                apkFile
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            openDownloadUrl(context, "https://github.com/$GITHUB_REPO/releases/latest")
         }
     }
 

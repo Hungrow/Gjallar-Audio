@@ -261,7 +261,53 @@ fun CanterosScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Acceso sutil a banco de sonidos externo (MyInstants)
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = Slate900,
+            border = BorderStroke(1.dp, Slate850),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    try {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.myinstants.com/es/index/es/")).apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {}
+                }
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.Public,
+                        contentDescription = null,
+                        tint = GjallarCyan,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "¿Quieres más efectos? Explorar en MyInstants",
+                        fontSize = 11.sp,
+                        color = Slate400
+                    )
+                }
+                Icon(
+                    Icons.Filled.OpenInNew,
+                    contentDescription = null,
+                    tint = Slate600,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         // ========================================================
         // 4. ESTADO VACÍO (FAVORITOS O BÚSQUEDA SIN RESULTADOS)

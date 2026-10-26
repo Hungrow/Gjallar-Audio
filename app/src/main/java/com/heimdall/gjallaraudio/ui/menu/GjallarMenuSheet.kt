@@ -318,10 +318,22 @@ fun GjallarMenuSheet(
                                         Spacer(modifier = Modifier.height(10.dp))
                                         Button(
                                             onClick = {
-                                                GitHubUpdateChecker.openDownloadUrl(context, status.downloadUrl)
+                                                coroutineScope.launch {
+                                                    updateStatus = UpdateStatus.Downloading(0f)
+                                                    GitHubUpdateChecker.downloadAndInstall(
+                                                        context = context,
+                                                        downloadUrl = status.downloadUrl,
+                                                        onProgress = { p ->
+                                                            updateStatus = UpdateStatus.Downloading(p)
+                                                        },
+                                                        onError = { err ->
+                                                            updateStatus = UpdateStatus.Error(err)
+                                                        }
+                                                    )
+                                                }
                                             },
                                             colors = ButtonDefaults.buttonColors(containerColor = GjallarCyan),
-                                            shape = RoundedCornerShape(8.dp),
+                                            shape = RoundedCornerShape(10.dp),
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
                                             Icon(
@@ -332,12 +344,64 @@ fun GjallarMenuSheet(
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = "Descargar e Instalar (.apk)",
+                                                text = "Instalar Actualización Automática",
                                                 fontWeight = FontWeight.Bold,
                                                 color = Slate950,
                                                 fontSize = 13.sp
                                             )
                                         }
+
+                                        Text(
+                                            text = "Se descarga en caché temporal y se autoelimina al reiniciar (0 MB en Descargas)",
+                                            fontSize = 10.sp,
+                                            color = Slate400,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            is UpdateStatus.Downloading -> {
+                                Surface(
+                                    color = GjallarCyan.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, GjallarCyan),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Descargando actualización...",
+                                                fontWeight = FontWeight.Bold,
+                                                color = GjallarCyan,
+                                                fontSize = 13.sp
+                                            )
+                                            Text(
+                                                text = "${(status.progress * 100).toInt()}%",
+                                                fontWeight = FontWeight.Black,
+                                                color = GjallarCyan,
+                                                fontSize = 13.sp
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        LinearProgressIndicator(
+                                            progress = { status.progress },
+                                            modifier = Modifier.fillMaxWidth().height(6.dp),
+                                            color = GjallarCyan,
+                                            trackColor = Slate800
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "Al terminar, se abrirá el instalador. No ocupará espacio en tu carpeta Descargas.",
+                                            fontSize = 10.sp,
+                                            color = Slate300
+                                        )
                                     }
                                 }
                             }
