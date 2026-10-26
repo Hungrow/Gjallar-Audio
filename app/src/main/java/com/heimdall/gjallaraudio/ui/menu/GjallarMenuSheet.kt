@@ -43,20 +43,19 @@ fun GjallarMenuSheet(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var updateStatus by remember { mutableStateOf<UpdateStatus>(UpdateStatus.Idle) }
-    var showCoffeeDialog by remember { mutableStateOf(false) }
 
-    // Preferencias del enlace de donación / café
-    val prefs = remember { context.getSharedPreferences("gjallar_settings", Context.MODE_PRIVATE) }
-    var coffeeUrl by remember {
-        mutableStateOf(prefs.getString("coffee_url", "https://paypal.me/HeimdallCorp") ?: "https://paypal.me/HeimdallCorp")
-    }
+    // Enlace oficial de PayPal
+    val coffeeUrl = "https://paypal.me/HeimdallCorp"
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
         containerColor = Slate950,
-        scrimColor = Color.Black.copy(alpha = 0.65f),
+        scrimColor = Color.Black.copy(alpha = 0.75f),
+        modifier = Modifier.fillMaxSize(),
         dragHandle = {
             BottomSheetDefaults.DragHandle(
                 color = Slate700,
@@ -64,7 +63,7 @@ fun GjallarMenuSheet(
                 height = 4.dp
             )
         },
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
         Column(
             modifier = Modifier
@@ -132,6 +131,20 @@ fun GjallarMenuSheet(
                         fontWeight = FontWeight.SemiBold,
                         color = GjallarCyan,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onDismissRequest,
+                    modifier = Modifier
+                        .padding(start = 4.dp)
+                        .size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Cerrar menú",
+                        tint = Slate400,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -575,42 +588,26 @@ fun GjallarMenuSheet(
                         lineHeight = 16.sp
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(coffeeUrl))
+                                context.startActivity(intent)
+                            } catch (_: Exception) {}
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF472B6)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
                     ) {
-                        Button(
-                            onClick = {
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(coffeeUrl))
-                                    context.startActivity(intent)
-                                } catch (_: Exception) {}
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF472B6)),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = "☕ Invitar a un Café (PayPal)",
-                                color = Slate950,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-
-                        OutlinedButton(
-                            onClick = { showCoffeeDialog = true },
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, Slate700)
-                        ) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = "Configurar enlace",
-                                tint = Slate300,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                        Text(
+                            text = "☕ Invitar a un Café (PayPal)",
+                            color = Slate950,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
                     }
                 }
             }
@@ -755,68 +752,5 @@ fun GjallarMenuSheet(
 
             Spacer(modifier = Modifier.height(28.dp))
         }
-    }
-
-    // Diálogo para personalizar el enlace de café
-    if (showCoffeeDialog) {
-        var tempUrl by remember { mutableStateOf(coffeeUrl) }
-
-        AlertDialog(
-            onDismissRequest = { showCoffeeDialog = false },
-            containerColor = Slate900,
-            titleContentColor = Slate50,
-            textContentColor = Slate300,
-            title = {
-                Text(
-                    text = "Enlace para recibir apoyos ☕",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "Puedes pegar tu enlace de Ko-fi, Buy Me a Coffee o PayPal.me. No necesitas crear ninguna pasarela bancaria: estas plataformas gestionan los cobros y te ingresan el dinero en tu cuenta bancaria directamente.",
-                        fontSize = 12.sp,
-                        color = Slate400,
-                        lineHeight = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = tempUrl,
-                        onValueChange = { tempUrl = it },
-                        label = { Text("URL de donación / PayPal") },
-                        placeholder = { Text("https://paypal.me/HeimdallCorp") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GjallarCyan,
-                            unfocusedBorderColor = Slate700,
-                            focusedTextColor = Slate100,
-                            unfocusedTextColor = Slate100,
-                            focusedLabelColor = GjallarCyan,
-                            unfocusedLabelColor = Slate400
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        coffeeUrl = tempUrl.trim()
-                        prefs.edit().putString("coffee_url", coffeeUrl).apply()
-                        showCoffeeDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GjallarCyan)
-                ) {
-                    Text("Guardar", color = Slate950, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCoffeeDialog = false }) {
-                    Text("Cancelar", color = Slate400)
-                }
-            }
-        )
     }
 }

@@ -1,6 +1,7 @@
 package com.heimdall.gjallaraudio.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.NightsStay
@@ -27,6 +28,13 @@ enum class GjallarDestination(
         subtitle = "Video a Audio MP3/WAV",
         icon = Icons.Filled.VideoSettings,
         navLabel = "Forge"
+    ),
+    CANTEROS(
+        route = "canteros",
+        title = "Los Canteros",
+        subtitle = "Botonera de Frases y Sonidos",
+        icon = Icons.Filled.Campaign,
+        navLabel = "Canteros"
     ),
     VOICE(
         route = "voice",

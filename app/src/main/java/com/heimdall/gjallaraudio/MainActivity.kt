@@ -28,6 +28,7 @@ import com.heimdall.gjallaraudio.feature.forge.ForgeScreen
 import com.heimdall.gjallaraudio.feature.lab.LabScreen
 import com.heimdall.gjallaraudio.feature.night.NightScreen
 import com.heimdall.gjallaraudio.feature.night.SleepTimerService
+import com.heimdall.gjallaraudio.feature.soundboard.CanterosScreen
 import com.heimdall.gjallaraudio.feature.voice.VoiceScreen
 import com.heimdall.gjallaraudio.ui.menu.GjallarMenuSheet
 import com.heimdall.gjallaraudio.ui.navigation.GjallarDestination
@@ -193,6 +194,7 @@ fun MainAppScaffold() {
             when (destination) {
                 GjallarDestination.NIGHT -> NightScreen()
                 GjallarDestination.FORGE -> ForgeScreen()
+                GjallarDestination.CANTEROS -> CanterosScreen()
                 GjallarDestination.VOICE -> VoiceScreen()
                 GjallarDestination.LAB -> LabScreen()
             }

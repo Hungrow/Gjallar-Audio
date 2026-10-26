@@ -27,51 +27,44 @@ object StorageHelper {
     }
 
     fun openFileManager(context: Context) {
-        // Intentar abrir el explorador de archivos en la carpeta de Música
         val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
         val gjallarDir = File(musicDir, "GjallarAudio")
         if (!gjallarDir.exists()) {
             gjallarDir.mkdirs()
         }
 
-        // Intento 1: DocumentsContract para Android 8+ (Abre el explorador de archivos nativo Files/Archivos)
+        // Forzar la ventana del sistema "Abrir con" (Chooser) para permitir
+        // al usuario elegir qué explorador de archivos desea usar
+        val primaryUri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Music%2FGjallarAudio")
+        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(primaryUri, "vnd.android.document/directory")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        val getContentIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "*/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+
         try {
-            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Music%2FGjallarAudio")
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "vnd.android.document/directory")
+            val chooser = Intent.createChooser(viewIntent, "Elige explorador de archivos").apply {
+                putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(getContentIntent))
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(intent)
+            context.startActivity(chooser)
             return
         } catch (_: Exception) {}
 
-        // Intento 2: Abrir carpeta Music general mediante DocumentsContract
         try {
-            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Music")
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "vnd.android.document/directory")
+            val chooser = Intent.createChooser(getContentIntent, "Elige explorador de archivos").apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(intent)
+            context.startActivity(chooser)
             return
         } catch (_: Exception) {}
 
-        // Intento 3: Intent genérico de gestor de archivos
-        try {
-            val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                type = "*/*"
-                addCategory(Intent.CATEGORY_OPENABLE)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(Intent.createChooser(intent, "Abrir explorador de archivos"))
-            return
-        } catch (_: Exception) {}
-
-        // Fallback: copiar ruta y avisar
         copyPathToClipboard(context)
-        Toast.makeText(context, "Ruta copiada: Abre tu explorador de archivos y ve a Music/GjallarAudio", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "Ruta copiada al portapapeles: $publicMusicDirPath", Toast.LENGTH_LONG).show()
     }
 
     data class GeneratedFileInfo(
