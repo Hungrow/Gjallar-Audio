@@ -26,45 +26,60 @@ object StorageHelper {
         Toast.makeText(context, "Ruta copiada al portapapeles: $publicMusicDirPath", Toast.LENGTH_SHORT).show()
     }
 
-    fun openFileManager(context: Context) {
+    fun openSystemFiles(context: Context) {
         val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
         val gjallarDir = File(musicDir, "GjallarAudio")
-        if (!gjallarDir.exists()) {
-            gjallarDir.mkdirs()
+        if (!gjallarDir.exists()) gjallarDir.mkdirs()
+
+        try {
+            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Music%2FGjallarAudio")
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "vnd.android.document/directory")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(context, "No se pudo abrir el explorador del sistema", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun openWithChooser(context: Context) {
+        val intents = mutableListOf<Intent>()
+
+        val knownPackages = listOf(
+            "com.sec.android.app.myfiles",
+            "com.mi.android.globalFileexplorer",
+            "com.google.android.apps.nbu.files",
+            "pl.solidexplorer2",
+            "com.cxinventor.file.explorer",
+            "com.ghisler.android.TotalCommander"
+        )
+
+        for (pkg in knownPackages) {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
+            if (launchIntent != null) {
+                intents.add(launchIntent)
+            }
         }
 
-        // Forzar la ventana del sistema "Abrir con" (Chooser) para permitir
-        // al usuario elegir qué explorador de archivos desea usar
-        val primaryUri = Uri.parse("content://com.android.externalstorage.documents/document/primary:Music%2FGjallarAudio")
-        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(primaryUri, "vnd.android.document/directory")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-
-        val getContentIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+        val baseIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
             type = "*/*"
             addCategory(Intent.CATEGORY_OPENABLE)
         }
 
-        try {
-            val chooser = Intent.createChooser(viewIntent, "Elige explorador de archivos").apply {
-                putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(getContentIntent))
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val chooser = Intent.createChooser(baseIntent, "¿Con qué aplicación deseas abrir?").apply {
+            if (intents.isNotEmpty()) {
+                putExtra(Intent.EXTRA_INITIAL_INTENTS, intents.toTypedArray())
             }
-            context.startActivity(chooser)
-            return
-        } catch (_: Exception) {}
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
 
         try {
-            val chooser = Intent.createChooser(getContentIntent, "Elige explorador de archivos").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
             context.startActivity(chooser)
-            return
-        } catch (_: Exception) {}
-
-        copyPathToClipboard(context)
-        Toast.makeText(context, "Ruta copiada al portapapeles: $publicMusicDirPath", Toast.LENGTH_LONG).show()
+        } catch (_: Exception) {
+            copyPathToClipboard(context)
+        }
     }
 
     data class GeneratedFileInfo(

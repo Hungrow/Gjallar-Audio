@@ -46,6 +46,7 @@ fun GjallarMenuSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var updateStatus by remember { mutableStateOf<UpdateStatus>(UpdateStatus.Idle) }
+    var showExplorerDialog by remember { mutableStateOf(false) }
 
     // Enlace oficial de PayPal
     val coffeeUrl = "https://paypal.me/HeimdallCorp"
@@ -432,7 +433,7 @@ fun GjallarMenuSheet(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
-                            onClick = { StorageHelper.openFileManager(context) },
+                            onClick = { showExplorerDialog = true },
                             colors = ButtonDefaults.buttonColors(containerColor = GjallarAmber),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.weight(1f)
@@ -752,5 +753,117 @@ fun GjallarMenuSheet(
 
             Spacer(modifier = Modifier.height(28.dp))
         }
+    }
+
+    if (showExplorerDialog) {
+        AlertDialog(
+            onDismissRequest = { showExplorerDialog = false },
+            containerColor = Slate900,
+            titleContentColor = Slate50,
+            textContentColor = Slate300,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.FolderOpen,
+                        contentDescription = null,
+                        tint = GjallarAmber,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Abrir Carpeta de Archivos", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Elige con qué aplicación deseas explorar los audios guardados:",
+                        fontSize = 12.sp,
+                        color = Slate400,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+
+                    // Opción 1: Selector de aplicaciones instaladas
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Slate850,
+                        border = BorderStroke(1.dp, Slate700),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showExplorerDialog = false
+                                StorageHelper.openWithChooser(context)
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Apps, contentDescription = null, tint = GjallarCyan, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Elegir aplicación instalada", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Slate100)
+                                Text("Samsung, Xiaomi, Solid Explorer, etc.", fontSize = 10.sp, color = Slate400)
+                            }
+                        }
+                    }
+
+                    // Opción 2: Gestor del sistema
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Slate850,
+                        border = BorderStroke(1.dp, Slate700),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showExplorerDialog = false
+                                StorageHelper.openSystemFiles(context)
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Folder, contentDescription = null, tint = GjallarAmber, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Explorador del Sistema", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Slate100)
+                                Text("Gestor predeterminado (Archivos / Files)", fontSize = 10.sp, color = Slate400)
+                            }
+                        }
+                    }
+
+                    // Opción 3: Copiar ruta
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Slate850,
+                        border = BorderStroke(1.dp, Slate700),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showExplorerDialog = false
+                                StorageHelper.copyPathToClipboard(context)
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, tint = Slate300, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Copiar ruta al portapapeles", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Slate100)
+                                Text(StorageHelper.publicMusicDirPath, fontSize = 9.sp, color = Slate500, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showExplorerDialog = false }) {
+                    Text("Cerrar", color = Slate400)
+                }
+            }
+        )
     }
 }

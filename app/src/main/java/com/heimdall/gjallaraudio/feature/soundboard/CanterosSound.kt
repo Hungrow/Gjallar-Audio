@@ -37,6 +37,26 @@ object CanterosCatalog {
         CanterosSound("homer_10", "¡A que te mato!", "Homer", "canteros/Homer/a_que_te_mato.mp3", "¡A que te mato! ¡A que te mato!"),
         CanterosSound("homer_11", "¡Catapúm!", "Homer", "canteros/Homer/catapum.mp3", "¡Catapúm chimpún!"),
 
+        // NED FLANDERS
+        CanterosSound("flanders_1", "Como si no llevara nada", "Flanders", "canteros/Ned Flanders/con_el_llevara_nada.mp3", "¡Como si no llevara nada! ¡Llevara nada! ¡Llevara nada!"),
+        CanterosSound("flanders_2", "¡Hola holita vecinitos!", "Flanders", "canteros/Ned Flanders/hola_holita_vecinitos.mp3", "¡Hola, holita, vecinitos!"),
+        CanterosSound("flanders_3", "¡Estamos perdiditos!", "Flanders", "canteros/Ned Flanders/estamos_perdiditos.mp3", "¡Estamos perdiditos! ¡Perdiditos!"),
+
+        // MOE SZYSLAK
+        CanterosSound("moe_1", "Ohlalá señor franchute", "Moe", "canteros/Moe/olala_monsieur_franchute.mp3", "¿Ohlalá, señor franchute? ¿Y cómo se dice entonces? Parqueadero."),
+        CanterosSound("moe_2", "Detector de mentiras", "Moe", "canteros/Moe/detector_mentiras_moe.mp3", "¿Detector de mentiras? ¡Pero si esto es una birria!"),
+
+        // NELSON MUNTZ
+        CanterosSound("nelson_1", "¡Ja, ja!", "Nelson", "canteros/Nelson/ja_ja.mp3", "¡Ja, ja!"),
+
+        // MILHOUSE
+        CanterosSound("milhouse_1", "A pedir de Milhouse", "Milhouse", "canteros/Milhouse/todo_pedir_milhouse.mp3", "¡Todo ha salido a pedir de Milhouse!"),
+        CanterosSound("milhouse_2", "En forma de chapa", "Milhouse", "canteros/Milhouse/ha_vuelto_chapa.mp3", "¿Alf? ¡Ha vuelto en forma de chapa!"),
+
+        // JEFE WIGGUM
+        CanterosSound("wiggum_1", "El señor Soborno", "Wiggum", "canteros/Jefe Wiggum/a_soborno_guino.mp3", "A quien estoy buscando *guiño* es al señor Soborno."),
+        CanterosSound("wiggum_2", "Máquina de escribir invisible", "Wiggum", "canteros/Jefe Wiggum/maquina_escribir_invisible.mp3", "Tecleando en mi máquina de escribir invisible..."),
+
         // RALPH WIGGUM
         CanterosSound("ralph_1", "El aliento de mi gato", "Ralph", "canteros/Ralph Wiggum/el_aliento_gato.mp3", "El aliento de mi gato huele a comida de gato."),
         CanterosSound("ralph_2", "¡Corre, plátano!", "Ralph", "canteros/Ralph Wiggum/corre_platano.mp3", "¡Corre, plátano!"),
@@ -74,5 +94,5 @@ object CanterosCatalog {
         CanterosSound("nick_1", "¡Hola Doctor Nick!", "Otros", "canteros/Doctor Nick/hola_dr_nick.mp3", "¡Hola a todo el mundo! ¡Hola Doctor Nick!")
     )
 
-    val categories = listOf("Todos", "Canteros", "Homer", "Ralph", "Burns", "Abuelo", "Bart", "Skinner", "Willie", "Apu", "Otros")
+    val categories = listOf("Todos", "Canteros", "Homer", "Flanders", "Moe", "Nelson", "Milhouse", "Ralph", "Burns", "Abuelo", "Bart", "Skinner", "Willie", "Otros")
 }
