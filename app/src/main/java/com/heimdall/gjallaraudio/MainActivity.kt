@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +29,7 @@ import com.heimdall.gjallaraudio.feature.lab.LabScreen
 import com.heimdall.gjallaraudio.feature.night.NightScreen
 import com.heimdall.gjallaraudio.feature.night.SleepTimerService
 import com.heimdall.gjallaraudio.feature.voice.VoiceScreen
+import com.heimdall.gjallaraudio.ui.menu.GjallarMenuSheet
 import com.heimdall.gjallaraudio.ui.navigation.GjallarDestination
 import com.heimdall.gjallaraudio.ui.theme.*
 
@@ -48,24 +50,35 @@ class MainActivity : ComponentActivity() {
 fun MainAppScaffold() {
     var currentDestination by remember { mutableStateOf(GjallarDestination.NIGHT) }
     val isTimerRunning by SleepTimerService.isRunning.collectAsState()
+    var showMenuSheet by remember { mutableStateOf(false) }
+
+    if (showMenuSheet) {
+        GjallarMenuSheet(onDismissRequest = { showMenuSheet = false })
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showMenuSheet = true }
+                            .padding(end = 8.dp)
+                    ) {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = Slate850,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, GjallarCyan.copy(alpha = 0.5f)),
-                            modifier = Modifier.size(36.dp)
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GjallarCyan.copy(alpha = 0.7f)),
+                            modifier = Modifier.size(38.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     Icons.Filled.GraphicEq,
-                                    contentDescription = "Gjallar Audio",
+                                    contentDescription = "Abrir Menú Gjallar",
                                     tint = GjallarCyan,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
@@ -89,7 +102,7 @@ fun MainAppScaffold() {
                                 )
                             }
                             Text(
-                                text = "ECOSISTEMA HEIMDALL",
+                                text = "ECOSISTEMA HEIMDALL • MENÚ",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 0.8.sp,

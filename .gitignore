@@ -19,3 +19,9 @@ app/build/
 /*.jpg
 /UVR_MDXNET_KARA.onnx
 
+# Keystore files
+*.keystore
+*.jks
+keystore.properties
+
+

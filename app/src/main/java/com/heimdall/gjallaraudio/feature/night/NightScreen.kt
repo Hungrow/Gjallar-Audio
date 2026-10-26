@@ -13,6 +13,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -342,98 +344,320 @@ private fun SleepTimerSection(
     var fadeOutEnabled by remember { mutableStateOf(true) }
     var shakeToExtend by remember { mutableStateOf(true) }
     var smartSleepDetection by remember { mutableStateOf(true) }
+    val scrollState = rememberScrollState()
 
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // TARJETA PRINCIPAL DEL CONTADOR
         Card(
-            colors = CardDefaults.cardColors(containerColor = Slate800),
-            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Slate900),
+            shape = RoundedCornerShape(22.dp),
             border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                if (isRunning) GjallarCyan else Slate700
+                1.5.dp,
+                if (isRunning) GjallarCyan else Slate800
             ),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = if (isRunning) "GUARDIÁN DE SUEÑO ACTIVO" else "TIEMPO SELECCIONADO",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isRunning) GjallarCyan else Slate400,
-                    fontWeight = FontWeight.Bold
-                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (isRunning) GjallarCyan.copy(alpha = 0.15f) else Slate800,
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isRunning) GjallarCyan else Slate700
+                    )
+                ) {
+                    Text(
+                        text = if (isRunning) "ᛉ GUARDIÁN DE SUEÑO ACTIVO" else "ᛟ DURACIÓN DEL TEMPORIZADOR",
+                        fontSize = 11.sp,
+                        color = if (isRunning) GjallarCyan else Slate300,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
 
                 val displaySeconds = if (isRunning) remainingSeconds else selectedMinutes * 60
-                val min = displaySeconds / 60
+                val hours = displaySeconds / 3600
+                val min = (displaySeconds % 3600) / 60
                 val sec = displaySeconds % 60
+
+                val timeFormatted = if (hours > 0) {
+                    String.format("%02d:%02d:%02d", hours, min, sec)
+                } else {
+                    String.format("%02d:%02d", min, sec)
+                }
+
                 Text(
-                    text = String.format("%02d:%02d", min, sec),
-                    fontSize = 54.sp,
+                    text = timeFormatted,
+                    fontSize = 58.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.sp,
                     color = if (isRunning) GjallarCyan else Slate50,
-                    modifier = Modifier.padding(vertical = 12.dp)
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                 )
 
                 Text(
-                    text = if (isRunning) "Pausará la música y atenuará el volumen al finalizar"
-                           else "Elige los minutos antes de dormir",
+                    text = if (isRunning) "La música se atenuará y apagará al agotarse el tiempo"
+                           else "${selectedMinutes} minutos programados",
                     style = MaterialTheme.typography.bodySmall,
                     color = Slate400,
                     textAlign = TextAlign.Center
                 )
-            }
-        }
 
-        if (!isRunning) {
-            Text(
-                text = "Accesos Rápidos:",
-                style = MaterialTheme.typography.titleSmall,
-                color = Slate300,
-                modifier = Modifier.align(Alignment.Start)
-            )
+                if (!isRunning) {
+                    Spacer(modifier = Modifier.height(16.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf(15L, 30L, 45L, 60L, 90L).forEach { mins ->
-                    val isSelected = selectedMinutes == mins
-                    Button(
-                        onClick = { selectedMinutes = mins },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isSelected) GjallarCyan else Slate850,
-                            contentColor = if (isSelected) Slate950 else Slate300
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) GjallarCyan else Slate700),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(vertical = 8.dp)
+                    // Botones de ajuste fino (+/-)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${mins}m",
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 13.sp
-                        )
+                        OutlinedButton(
+                            onClick = { selectedMinutes = (selectedMinutes - 10).coerceAtLeast(1L) },
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Slate700),
+                            colors = ButtonDefaults.outlinedButtonColors(containerColor = Slate850),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text("-10m", color = Slate300, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        OutlinedButton(
+                            onClick = { selectedMinutes = (selectedMinutes - 1).coerceAtLeast(1L) },
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Slate700),
+                            colors = ButtonDefaults.outlinedButtonColors(containerColor = Slate850),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text("-1m", color = Slate300, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        OutlinedButton(
+                            onClick = { selectedMinutes = (selectedMinutes + 1).coerceAtMost(240L) },
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GjallarCyan.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(containerColor = Slate850),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text("+1m", color = GjallarCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        OutlinedButton(
+                            onClick = { selectedMinutes = (selectedMinutes + 10).coerceAtMost(240L) },
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GjallarCyan.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(containerColor = Slate850),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text("+10m", color = GjallarCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Slider interactivo (1 a 180 min)
+                    Slider(
+                        value = selectedMinutes.toFloat(),
+                        onValueChange = { selectedMinutes = it.toLong().coerceIn(1L, 240L) },
+                        valueRange = 1f..180f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = GjallarCyan,
+                            activeTrackColor = GjallarCyan,
+                            inactiveTrackColor = Slate800
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("1m", fontSize = 11.sp, color = Slate500)
+                        Text("30m", fontSize = 11.sp, color = Slate500)
+                        Text("1 hora", fontSize = 11.sp, color = Slate500)
+                        Text("2 horas", fontSize = 11.sp, color = Slate500)
+                        Text("3 horas", fontSize = 11.sp, color = Slate500)
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Accesos rápidos (Chips)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(5L, 15L, 30L, 45L, 60L, 90L).forEach { mins ->
+                            val isSelected = selectedMinutes == mins
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) GjallarCyan else Slate850,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (isSelected) GjallarCyan else Slate700
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { selectedMinutes = mins }
+                            ) {
+                                Text(
+                                    text = "${mins}m",
+                                    color = if (isSelected) Slate950 else Slate300,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
 
+        // ==========================================
+        // BOTÓN PRINCIPAL DE INICIO / DETENER
+        // ==========================================
+        if (!isRunning) {
+            Button(
+                onClick = {
+                    val intent = Intent(context, SleepTimerService::class.java).apply {
+                        action = SleepTimerService.ACTION_START
+                        putExtra(SleepTimerService.EXTRA_DURATION_SECONDS, selectedMinutes * 60)
+                        putExtra(SleepTimerService.EXTRA_FADE_OUT_MINUTES, if (fadeOutEnabled) 2L else 0L)
+                        putExtra(SleepTimerService.EXTRA_SHAKE_TO_EXTEND, shakeToExtend)
+                        putExtra(SleepTimerService.EXTRA_SMART_SLEEP_DETECTION, smartSleepDetection)
+                    }
+                    context.startService(intent)
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GjallarCyan,
+                    contentColor = Slate950
+                ),
+                shape = RoundedCornerShape(16.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(58.dp)
+            ) {
+                Icon(
+                    Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(26.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "INICIAR TEMPORIZADOR (${selectedMinutes} MIN)",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 16.sp,
+                    letterSpacing = 0.5.sp
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = {
+                        val intent = Intent(context, SleepTimerService::class.java).apply {
+                            action = SleepTimerService.ACTION_STOP
+                        }
+                        context.startService(intent)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RoseRed,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .weight(1.8f)
+                        .height(56.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Stop,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "DETENER",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(context, SleepTimerService::class.java).apply {
+                            action = SleepTimerService.ACTION_EXTEND
+                        }
+                        context.startService(intent)
+                    },
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, GjallarCyan),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Slate900),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .height(56.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = null,
+                        tint = GjallarCyan,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "+10 MIN",
+                        fontWeight = FontWeight.Bold,
+                        color = GjallarCyan,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
+        // ==========================================
+        // OPCIONES INTELIGENTES (AVANZADAS)
+        // ==========================================
         Card(
-            colors = CardDefaults.cardColors(containerColor = Slate800),
+            colors = CardDefaults.cardColors(containerColor = Slate900),
             shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Slate700),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Slate800),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "CONFIGURACIÓN INTELIGENTE",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Slate400,
+                    letterSpacing = 0.8.sp,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -450,7 +674,7 @@ private fun SleepTimerSection(
                     )
                 }
 
-                HorizontalDivider(color = Slate700, modifier = Modifier.padding(vertical = 12.dp))
+                HorizontalDivider(color = Slate800, modifier = Modifier.padding(vertical = 12.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -467,7 +691,8 @@ private fun SleepTimerSection(
                         colors = SwitchDefaults.colors(checkedThumbColor = GjallarCyan, checkedTrackColor = Slate850)
                     )
                 }
-                HorizontalDivider(color = Slate700, modifier = Modifier.padding(vertical = 12.dp))
+
+                HorizontalDivider(color = Slate800, modifier = Modifier.padding(vertical = 12.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -487,44 +712,7 @@ private fun SleepTimerSection(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
-
-        Button(
-            onClick = {
-                val intent = Intent(context, SleepTimerService::class.java).apply {
-                    if (isRunning) {
-                        action = SleepTimerService.ACTION_STOP
-                    } else {
-                        action = SleepTimerService.ACTION_START
-                        putExtra(SleepTimerService.EXTRA_DURATION_SECONDS, selectedMinutes * 60)
-                        putExtra(SleepTimerService.EXTRA_FADE_OUT_MINUTES, if (fadeOutEnabled) 2L else 0L)
-                        putExtra(SleepTimerService.EXTRA_SHAKE_TO_EXTEND, shakeToExtend)
-                        putExtra(SleepTimerService.EXTRA_SMART_SLEEP_DETECTION, smartSleepDetection)
-                    }
-                }
-                context.startService(intent)
-            },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isRunning) RoseRed else GjallarCyan,
-                contentColor = if (isRunning) Color.White else Slate950
-            ),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-        ) {
-            Icon(
-                if (isRunning) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = if (isRunning) "DETENER TEMPORIZADOR" else "ACTIVAR SLEEP TIMER",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            )
-        }
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
